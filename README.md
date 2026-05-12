@@ -2,6 +2,14 @@
 Meridien Engine is a unified platform that powers a bussiness intelligence and cusstomer ecosystem - combining a multi-tenant ERP/CRM core with AI reasoning layer that lets operators undrestand their customers deeply and serve them intelligently, without givinig the AI unsupervised acess to bussiness data. 
 
 ---
+## Prior Work
+
+This project is a ground-up rewrite of [MERIDIEN](https://github.com/meridien-engine/MERIDIEN),
+the original ERP/CRM system that informed this architecture.
+The old repository serves as a reference for decisions made and lessons learned —
+not as a codebase to migrate from.
+
+---
 
 ## Repository Structure
 
@@ -36,12 +44,6 @@ meridien-engine/
 ├── docs/                       # Architecture, ADRs, API contracts
 └── scripts/                    # Dev tooling, migration runner, seed scripts
 ```
-## Prior Work
-
-This project is a ground-up rewrite of [MERIDIEN](https://github.com/meridien-engine/MERIDIEN),
-the original ERP/CRM system that informed this architecture.
-The old repository serves as a reference for decisions made and lessons learned —
-not as a codebase to migrate from.
 
 ## Tech Stack
 
