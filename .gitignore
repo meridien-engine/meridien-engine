@@ -1,0 +1,25 @@
+# Environment
+.env
+*.env.local
+
+# Go
+backend/vendor/
+backend/*.out
+backend/coverage.out
+backend/meridien-engine
+
+# Node
+frontend/node_modules/
+frontend/apps/*/node_modules/
+frontend/apps/*/dist/
+frontend/apps/*/.next/
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
