@@ -1,0 +1,87 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  backend:
+    name: Backend
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER:     meridien
+          POSTGRES_PASSWORD: meridien
+          POSTGRES_DB:       meridien_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+          cache: true
+
+      - name: Install golang-migrate
+        run: |
+          curl -L https://github.com/golang-migrate/migrate/releases/download/v4.17.1/migrate.linux-amd64.tar.gz | tar xvz
+          sudo mv migrate /usr/local/bin/
+
+      - name: Run migrations
+        working-directory: backend
+        env:
+          DATABASE_URL: postgres://meridien:meridien@localhost:5432/meridien_test?sslmode=disable
+        run: |
+          migrate -path db/migrations -database "$DATABASE_URL" up
+
+      - name: Verify sqlc is up to date
+        working-directory: backend
+        run: |
+          go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
+          sqlc generate
+          git diff --exit-code internal/db
+
+      - name: go vet
+        working-directory: backend
+        run: go vet ./...
+
+      - name: Run tests
+        working-directory: backend
+        env:
+          DATABASE_URL: postgres://meridien:meridien@localhost:5432/meridien_test?sslmode=disable
+          REDIS_URL:    redis://localhost:6379
+          JWT_SECRET:   test-secret-not-for-production
+        run: go test ./... -v -race -coverprofile=coverage.out
+
+      - name: Check coverage threshold (60%)
+        working-directory: backend
+        run: |
+          COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | tr -d '%')
+          echo "Coverage: $COVERAGE%"
+          if (( $(echo "$COVERAGE < 60" | bc -l) )); then
+            echo "Coverage $COVERAGE% is below 60% threshold"
+            exit 1
+          fi
