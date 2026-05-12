@@ -36,6 +36,12 @@ meridien-engine/
 ├── docs/                       # Architecture, ADRs, API contracts
 └── scripts/                    # Dev tooling, migration runner, seed scripts
 ```
+## Prior Work
+
+This project is a ground-up rewrite of [MERIDIEN](https://github.com/meridien-engine/MERIDIEN),
+the original ERP/CRM system that informed this architecture.
+The old repository serves as a reference for decisions made and lessons learned —
+not as a codebase to migrate from.
 
 ## Tech Stack
 
