@@ -23,6 +23,9 @@ frontend/apps/*/.next/
 # Unstructured planning docs (superseded by docs/implementation_blueprint.md)
 docs/Plan_unstructured/
 
+# Graphify
+graphify-out/
+
 # Build output
 backend/bin/
 
