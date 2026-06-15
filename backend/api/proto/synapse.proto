@@ -1,0 +1,68 @@
+syntax = "proto3";
+
+package meridien.synapse;
+option go_package = "github.com/meridien-engine/meridien-engine/internal/gen/synapse";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SynapseService — Customer identity resolution and interaction recording.
+//
+// GetCustomerProfile: Mera calls this first on every inbound message.
+//   It resolves the UCM from the external channel identifier and returns
+//   the semantic summary as context for the LLM prompt.
+//
+// RecordInteraction: Mera calls this after producing a response to persist
+//   the full observability trace (prompt, thoughts, tools, retrieved chunks).
+// ─────────────────────────────────────────────────────────────────────────────
+
+service SynapseService {
+  rpc GetCustomerProfile  (ProfileRequest)     returns (ProfileResponse);
+  rpc RecordInteraction   (InteractionRecord)  returns (InteractionResponse);
+}
+
+// ─── Profile Resolution ───────────────────────────────────────────────────────
+
+message ProfileRequest {
+  string channel_type        = 1; // "whatsapp" | "messenger" | "web"
+  string channel_external_id = 2; // Phone number or platform user ID
+}
+
+message ProfileResponse {
+  string customer_id       = 1; // UUID of the customer_profiles row
+  string unified_name      = 2;
+  string customer_tier     = 3; // "standard" | "silver" | "gold"
+  string semantic_summary  = 4; // Injected into Mera's system prompt as memory
+  bool   is_new_customer   = 5; // True if Synapse created a new UCM row
+}
+
+// ─── Interaction Recording ────────────────────────────────────────────────────
+
+message RetrievedContext {
+  string content = 1; // Knowledge chunk text
+  double score   = 2; // Cosine similarity score [0, 1]
+}
+
+message ToolCall {
+  string tool_name = 1;
+  string args_json = 2;   // JSON-encoded args
+  string result_json = 3; // JSON-encoded result
+}
+
+message InteractionRecord {
+  string customer_id   = 1;
+  string channel       = 2;
+  string inbound_msg   = 3;
+  string outbound_msg  = 4;
+  int32  tokens_used   = 5;
+  int32  latency_ms    = 6;
+
+  // Trace data — used to populate interaction_traces for Compass
+  string system_prompt       = 7;
+  string raw_agent_thoughts  = 8;
+  repeated RetrievedContext retrieved_contexts = 9;
+  repeated ToolCall tools_called               = 10;
+}
+
+message InteractionResponse {
+  string interaction_id = 1;
+  bool   success        = 2;
+}

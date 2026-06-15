@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+package meridien.knowledge;
+option go_package = "github.com/meridien-engine/meridien-engine/internal/gen/knowledge";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// KnowledgeService — Vector RAG retrieval and document ingestion.
+//
+// QueryKnowledge: Mera calls this before constructing its LLM prompt to
+//   retrieve the most relevant knowledge chunks from the merchant's uploaded
+//   documents (pgvector cosine similarity search).
+//
+// IngestDocument: Called by the merchant portal after a document upload to
+//   chunk, embed, and store the document into knowledge_nodes.
+// ─────────────────────────────────────────────────────────────────────────────
+
+service KnowledgeService {
+  rpc QueryKnowledge  (KnowledgeQuery)    returns (KnowledgeResult);
+  rpc IngestDocument  (IngestRequest)     returns (IngestResponse);
+}
+
+// ─── Query ────────────────────────────────────────────────────────────────────
+
+message KnowledgeQuery {
+  string query_text = 1; // Raw customer message or reformulated query
+  int32  top_k      = 2; // Number of chunks to return (default: 5)
+}
+
+message KnowledgeChunk {
+  string node_id    = 1;
+  string source     = 2; // Document filename / title
+  string content    = 3;
+  double score      = 4; // Cosine similarity [0, 1]
+}
+
+message KnowledgeResult {
+  repeated KnowledgeChunk chunks = 1;
+}
+
+// ─── Ingest ───────────────────────────────────────────────────────────────────
+
+message IngestRequest {
+  string source_name = 1; // Filename or manual title
+  string content     = 2; // Full raw text (chunking handled server-side)
+}
+
+message IngestResponse {
+  int32  chunks_created = 1;
+  bool   success        = 2;
+}

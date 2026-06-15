@@ -1,0 +1,75 @@
+syntax = "proto3";
+
+package meridien.erp.orders;
+option go_package = "github.com/meridien-engine/meridien-engine/internal/gen/orders";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// OrderService — Transactional ERP core.
+//
+// Note on pricing: The AI agent (Mera) NEVER submits a price. OrderRequest
+// contains only SKU + quantity. The ERP service resolves the authoritative
+// catalog price before writing order_items. This is the zero-hallucination
+// price guardrail.
+// ─────────────────────────────────────────────────────────────────────────────
+
+service OrderService {
+  // PlaceNewOrder is called by Mera's tool layer to create an order.
+  // The business context (business_id) is injected server-side from the
+  // authenticated JWT — never trusted from the client payload.
+  rpc PlaceNewOrder   (OrderRequest)   returns (OrderResponse);
+
+  // GetOrderStatus is used by Mera to answer "where is my order?" queries.
+  rpc GetOrderStatus  (StatusRequest)  returns (StatusResponse);
+
+  // GetOrderDetails fetches line-item history for dispute resolution context.
+  rpc GetOrderDetails (DetailsRequest) returns (DetailsResponse);
+}
+
+// ─── Request / Response Messages ─────────────────────────────────────────────
+
+message OrderLineItem {
+  string sku      = 1; // Product SKU — used to resolve catalog price server-side
+  int32  quantity = 2;
+}
+
+message OrderRequest {
+  string customer_id = 1;
+  string source      = 2; // "agent" | "portal"
+  string notes       = 3;
+  repeated OrderLineItem items = 4;
+}
+
+message OrderResponse {
+  string order_id         = 1;
+  string status           = 2; // "pending" | "completed"
+  string confirmation_msg = 3;
+  double total_price      = 4; // Catalog-resolved total — returned for Mera to relay
+}
+
+message StatusRequest {
+  string order_id = 1;
+}
+
+message StatusResponse {
+  string order_id            = 1;
+  string status              = 2;
+  string estimated_delivery  = 3; // ISO 8601 date string or empty
+}
+
+message DetailsRequest {
+  string order_id = 1;
+}
+
+message OrderLineItemDetail {
+  string sku        = 1;
+  string name       = 2;
+  int32  quantity   = 3;
+  double unit_price = 4;
+}
+
+message DetailsResponse {
+  string order_id  = 1;
+  string status    = 2;
+  double total     = 3;
+  repeated OrderLineItemDetail items = 4;
+}
