@@ -1,0 +1,14 @@
+# Grafana dashboard provisioning — auto-loads dashboards from JSON files.
+apiVersion: 1
+
+providers:
+  - name: "Meridien Engine"
+    orgId: 1
+    folder: "Meridien Engine"
+    type: file
+    disableDeletion: false
+    editable: true
+    updateIntervalSeconds: 10
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: false

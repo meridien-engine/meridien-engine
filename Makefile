@@ -1,12 +1,32 @@
-.PHONY: up down migrate migrate-down sqlc test lint
+.PHONY: up down logs migrate migrate-down sqlc test lint run build vet
 
 # ── Infrastructure ────────────────────────────────────────────────────────────
 
 up:
 	docker compose up -d
 
+up-build:
+	docker compose up -d --build
+
 down:
 	docker compose down
+
+logs:
+	docker compose logs -f backend
+
+# ── Observability ─────────────────────────────────────────────────────────────
+# Prometheus:  http://localhost:9090
+# Grafana:     http://localhost:3000  (admin / meridien)
+# Backend:     http://localhost:8080
+
+healthz:
+	@curl -s http://localhost:8080/healthz | python3 -m json.tool
+
+readyz:
+	@curl -s http://localhost:8080/readyz | python3 -m json.tool
+
+metrics:
+	@curl -s http://localhost:8080/metrics | head -60
 
 # ── Migrations ────────────────────────────────────────────────────────────────
 
@@ -27,6 +47,14 @@ migrate-down:
 sqlc:
 	cd backend && sqlc generate
 
+# ── Build & verify ────────────────────────────────────────────────────────────
+
+build:
+	cd backend && go build -o bin/meridien-server ./cmd/server
+
+vet:
+	cd backend && go vet ./...
+
 # ── Testing ───────────────────────────────────────────────────────────────────
 
 test:
@@ -41,4 +69,6 @@ lint:
 # ── Run ───────────────────────────────────────────────────────────────────────
 
 run:
-	cd backend && go run ./cmd/server/main.go
+	cd backend && \
+	DATABASE_URL="postgres://meridien:meridien@localhost:5432/meridien?sslmode=disable" \
+	go run ./cmd/server

@@ -1,0 +1,26 @@
+# Prometheus configuration for Meridien Engine.
+# Scrapes the Go backend's /metrics endpoint every 15 seconds.
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # ── Meridien Engine backend ──────────────────────────────────────────────────
+  - job_name: "meridien-engine"
+    static_configs:
+      - targets: ["backend:8080"]
+        labels:
+          service: "meridien-engine"
+          env: "development"
+    metrics_path: /metrics
+
+  # ── Prometheus self-monitoring ───────────────────────────────────────────────
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # ── PostgreSQL exporter (optional, uncomment when deploying pg_exporter) ────
+  # - job_name: "postgres"
+  #   static_configs:
+  #     - targets: ["postgres-exporter:9187"]
