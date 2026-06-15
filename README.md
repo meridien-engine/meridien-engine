@@ -21,6 +21,48 @@ Meridien Engine is a **Modular Monolith in Go** with four internal service bound
 | **Knowledge** | pgvector RAG — semantic search over merchant-uploaded documents | `internal/repository` (knowledge) |
 | **Mera Brain** | AI agent ReAct loop, tool dispatch, full trace recording | `internal/brain` |
 
+### System Topology Overview
+
+Meridien Engine is architected as a **Modular Monolith in Go**. High performance and loose coupling are enforced via **internal gRPC communication channels** between isolated functional layers, while external entry points are handled via REST/Webhooks (for user interfaces and messaging channels).
+
+```text
+ ┌────────────────────────────────────────────────────────────────────────┐  
+ │                           EXTERNAL CLIENTS                             │  
+ └───────┬───────────────────────────┬────────────────────────────┬───────┘  
+         │ (HTTP REST)               │ (DMs / Webhooks)           │ (HTTP REST)  
+         ▼                           ▼                            ▼  
+ ┌───────────────┐           ┌───────────────┐            ┌───────────────┐  
+ │ Meridien ERP  │           │  Mera Agent   │            │ Compass Dash  │  
+ │   Frontend    │           │ (Chat/Social) │            │ (Analytics)   │  
+ └───────┬───────┘           └───────┬───────┘            └───────┬───────┘  
+         │                           │                            │  
+ ════════╪═══════════════════════════╪════════════════════════════╪════════  
+         │                           ▼                            │  
+         │                   ┌───────────────┐                    │  
+         │                   │  Mera Brain   │                    │  
+         │                   │(Orchestrator) │                    │  
+         │                   └─┬─────┬─────┬─┘                    │  
+         │                     │     │     │                      │  
+         │              (gRPC) │     │     │ (gRPC)               │  
+         ▼                     ▼     │     ▼                      ▼  
+ ┌───────────────┐ ◄───────────┘     │   ┌───────────────┐ ◄──────┴───────┐  
+ │   ERP Core    │                   │   │    Synapse    │                │  
+ │   Service     │ ◄─────────────────┼──►│    Service    │ (Co-located)   │  
+ │               │                   │   │   & Compass   │                │  
+ └───────┬───────┘                   │   └───────┬───────┘ ◄──────────────┘  
+         │                           │           │  
+         ▼                           ▼           ▼  
+ ┌───────────────┐           ┌───────────────┐ ┌───────────────┐  
+ │ Postgres DB  │           │   Knowledge   │ │ Postgres DB  │  
+ │ (Tenant RLS)  │           │  Service (RAG)│ │  (Profiles)   │  
+ └───────────────┘           └───────┬───────┘ └───────────────┘  
+                                     ▼  
+                             ┌───────────────┐  
+                             │   Vector DB   │  
+                             │ (Embeddings)  │  
+                             └───────────────┘
+```
+
 Key design invariants:
 
 - **Multi-tenant isolation** is enforced at the PostgreSQL layer via Row-Level Security (`app.current_business` UUID). Every write goes through `ExecWithTenant`.
