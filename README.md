@@ -189,4 +189,6 @@ make metrics     # Preview Prometheus metrics
 
 ## License
 
-Private — not open source.
+Proprietary. Copyright © 2024-2025 MERIDIEN.
+
+**Muhammad Ali** — [GitHub](https://github.com/mu7ammad-3li/) · [LinkedIn](https://linkedin.com/in/muhammad-3lii) · muhammad.3lii@gmail.com
