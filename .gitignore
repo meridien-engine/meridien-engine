@@ -20,6 +20,12 @@ frontend/apps/*/.next/
 *.swp
 *.swo
 
+# Unstructured planning docs (superseded by docs/implementation_blueprint.md)
+docs/Plan_unstructured/
+
+# Build output
+backend/bin/
+
 # OS
 .DS_Store
 Thumbs.db
