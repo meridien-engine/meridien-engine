@@ -113,3 +113,29 @@ func (s *Service) GetOrderStatus(ctx context.Context, orderID uuid.UUID) (*domai
 func (s *Service) GetOrderDetails(ctx context.Context, orderID uuid.UUID) (*domain.Order, error) {
 	return s.orders.GetByID(ctx, orderID)
 }
+
+// CreateProduct creates a new product catalog entry.
+func (s *Service) CreateProduct(ctx context.Context, p *domain.Product) (*domain.Product, error) {
+	return s.products.Create(ctx, p)
+}
+
+// GetProductByID retrieves a product by its ID.
+func (s *Service) GetProductByID(ctx context.Context, id uuid.UUID) (*domain.Product, error) {
+	return s.products.GetByID(ctx, id)
+}
+
+// ListProducts retrieves all active products.
+func (s *Service) ListProducts(ctx context.Context) ([]domain.Product, error) {
+	return s.products.List(ctx)
+}
+
+// ListOrdersByCustomer retrieves all orders placed by a specific customer.
+func (s *Service) ListOrdersByCustomer(ctx context.Context, customerID uuid.UUID) ([]domain.Order, error) {
+	return s.orders.ListByCustomer(ctx, customerID)
+}
+
+// UpdateOrderStatus updates the status of an existing order.
+func (s *Service) UpdateOrderStatus(ctx context.Context, orderID uuid.UUID, status domain.OrderStatus) (*domain.Order, error) {
+	return s.orders.UpdateStatus(ctx, orderID, status)
+}
+

@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/meridien-engine/meridien-engine/internal/domain"
+	pb "github.com/meridien-engine/meridien-engine/internal/gen/synapse"
 	"github.com/meridien-engine/meridien-engine/internal/metrics"
 	"github.com/meridien-engine/meridien-engine/internal/synapse"
 	"google.golang.org/grpc/codes"
@@ -15,6 +16,7 @@ import (
 
 // SynapseHandler implements the gRPC SynapseService server interface.
 type SynapseHandler struct {
+	pb.UnimplementedSynapseServiceServer
 	svc *synapse.Service
 }
 
@@ -24,21 +26,21 @@ func NewSynapseHandler(svc *synapse.Service) *SynapseHandler {
 
 // GetCustomerProfile resolves the UCM from a channel identifier.
 // Called by Mera at the start of every conversation turn.
-func (h *SynapseHandler) GetCustomerProfile(ctx context.Context, req *GetCustomerProfileRequest) (*GetCustomerProfileResponse, error) {
-	if req.ChannelType == "" || req.ChannelExternalID == "" {
+func (h *SynapseHandler) GetCustomerProfile(ctx context.Context, req *pb.ProfileRequest) (*pb.ProfileResponse, error) {
+	if req.ChannelType == "" || req.ChannelExternalId == "" {
 		return nil, status.Error(codes.InvalidArgument, "channel_type and channel_external_id are required")
 	}
 
 	profile, isNew, err := h.svc.GetOrCreateCustomer(ctx,
 		domain.ChannelType(req.ChannelType),
-		req.ChannelExternalID,
+		req.ChannelExternalId,
 	)
 	if err != nil {
 		return nil, status.Error(codes.Internal, "failed to resolve customer profile")
 	}
 
-	return &GetCustomerProfileResponse{
-		CustomerID:      profile.ID.String(),
+	return &pb.ProfileResponse{
+		CustomerId:      profile.ID.String(),
 		UnifiedName:     profile.UnifiedName,
 		CustomerTier:    string(profile.CustomerTier),
 		SemanticSummary: profile.SemanticSummary,
@@ -48,12 +50,12 @@ func (h *SynapseHandler) GetCustomerProfile(ctx context.Context, req *GetCustome
 
 // RecordInteraction persists the full interaction log + observability trace.
 // Called by Mera synchronously after producing its response.
-func (h *SynapseHandler) RecordInteraction(ctx context.Context, req *RecordInteractionRequest) (*RecordInteractionResponse, error) {
-	if req.CustomerID == "" || req.InboundMsg == "" {
+func (h *SynapseHandler) RecordInteraction(ctx context.Context, req *pb.InteractionRecord) (*pb.InteractionResponse, error) {
+	if req.CustomerId == "" || req.InboundMsg == "" {
 		return nil, status.Error(codes.InvalidArgument, "customer_id and inbound_msg are required")
 	}
 
-	customerID, err := uuid.Parse(req.CustomerID)
+	customerID, err := uuid.Parse(req.CustomerId)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid customer_id")
 	}
@@ -69,8 +71,8 @@ func (h *SynapseHandler) RecordInteraction(ctx context.Context, req *RecordInter
 	for i, t := range req.ToolsCalled {
 		tools[i] = domain.ToolCall{
 			ToolName:   t.ToolName,
-			ArgsJSON:   t.ArgsJSON,
-			ResultJSON: t.ResultJSON,
+			ArgsJSON:   t.ArgsJson,
+			ResultJSON: t.ResultJson,
 		}
 	}
 
@@ -101,52 +103,71 @@ func (h *SynapseHandler) RecordInteraction(ctx context.Context, req *RecordInter
 	)
 	metrics.LLMTokensUsed.WithLabelValues("total").Add(float64(req.TokensUsed))
 
-	return &RecordInteractionResponse{
-		InteractionID: log.ID.String(),
+	return &pb.InteractionResponse{
+		InteractionId: log.ID.String(),
 		Success:       true,
 	}, nil
 }
 
-// ─── DTO types ────────────────────────────────────────────────────────────────
-
-type GetCustomerProfileRequest struct {
-	ChannelType       string
-	ChannelExternalID string
+// GetCustomerByID retrieves a customer profile by ID.
+func (h *SynapseHandler) GetCustomerByID(ctx context.Context, req *pb.GetCustomerByIDRequest) (*pb.GetCustomerByIDResponse, error) {
+	id, err := uuid.Parse(req.CustomerId)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid customer_id UUID")
+	}
+	profile, err := h.svc.GetCustomerByID(ctx, id)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to get customer profile: "+err.Error())
+	}
+	return &pb.GetCustomerByIDResponse{
+		CustomerId:      profile.ID.String(),
+		UnifiedName:     profile.UnifiedName,
+		CustomerTier:    string(profile.CustomerTier),
+		SemanticSummary: profile.SemanticSummary,
+	}, nil
 }
 
-type GetCustomerProfileResponse struct {
-	CustomerID      string
-	UnifiedName     string
-	CustomerTier    string
-	SemanticSummary string
-	IsNewCustomer   bool
+// UpdateCustomerTier updates the customer tier.
+func (h *SynapseHandler) UpdateCustomerTier(ctx context.Context, req *pb.UpdateCustomerTierRequest) (*pb.UpdateCustomerTierResponse, error) {
+	id, err := uuid.Parse(req.CustomerId)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid customer_id UUID")
+	}
+	err = h.svc.UpdateCustomerTier(ctx, id, domain.CustomerTier(req.Tier))
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to update customer tier: "+err.Error())
+	}
+	return &pb.UpdateCustomerTierResponse{
+		Success: true,
+	}, nil
 }
 
-type RetrievedContextDTO struct {
-	Content string
-	Score   float64
+// ListInteractionsByCustomer retrieves all interactions for a specific customer.
+func (h *SynapseHandler) ListInteractionsByCustomer(ctx context.Context, req *pb.ListInteractionsByCustomerRequest) (*pb.ListInteractionsByCustomerResponse, error) {
+	id, err := uuid.Parse(req.CustomerId)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid customer_id UUID")
+	}
+	logs, err := h.svc.ListInteractionsByCustomer(ctx, id)
+	if err != nil {
+		return nil, status.Error(codes.Internal, "failed to list interactions: "+err.Error())
+	}
+	resp := &pb.ListInteractionsByCustomerResponse{
+		Logs: make([]*pb.InteractionLogSummary, len(logs)),
+	}
+	for i, l := range logs {
+		resp.Logs[i] = &pb.InteractionLogSummary{
+			InteractionId: l.ID.String(),
+			CustomerId:    l.CustomerID.String(),
+			Channel:       string(l.Channel),
+			InboundMsg:    l.InboundMsg,
+			OutboundMsg:   l.OutboundMsg,
+			TokensUsed:    l.TokensUsed,
+			LatencyMs:     l.LatencyMs,
+			CreatedAt:     l.CreatedAt.Format(time.RFC3339),
+		}
+	}
+	return resp, nil
 }
 
-type ToolCallDTO struct {
-	ToolName   string
-	ArgsJSON   string
-	ResultJSON string
-}
 
-type RecordInteractionRequest struct {
-	CustomerID        string
-	Channel           string
-	InboundMsg        string
-	OutboundMsg       string
-	TokensUsed        int32
-	LatencyMs         int32
-	SystemPrompt      string
-	RawAgentThoughts  string
-	RetrievedContexts []*RetrievedContextDTO
-	ToolsCalled       []*ToolCallDTO
-}
-
-type RecordInteractionResponse struct {
-	InteractionID string
-	Success       bool
-}

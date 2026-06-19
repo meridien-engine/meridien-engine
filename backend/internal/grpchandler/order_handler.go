@@ -4,20 +4,22 @@ package grpchandler
 import (
 	"context"
 	"errors"
-
-	"github.com/meridien-engine/meridien-engine/internal/domain"
-	"github.com/meridien-engine/meridien-engine/internal/erp"
-	"github.com/meridien-engine/meridien-engine/internal/metrics"
-	"github.com/meridien-engine/meridien-engine/internal/repository"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
+	"time"
 
 	"github.com/google/uuid"
+	"github.com/meridien-engine/meridien-engine/internal/domain"
+	"github.com/meridien-engine/meridien-engine/internal/erp"
+	"github.com/meridien-engine/meridien-engine/internal/gen/orders"
+	"github.com/meridien-engine/meridien-engine/internal/metrics"
+	"github.com/shopspring/decimal"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // OrderHandler implements the gRPC OrderService server interface.
 // It bridges the transport layer to the ERP application service.
 type OrderHandler struct {
+	orders.UnimplementedOrderServiceServer
 	svc *erp.Service
 }
 
@@ -28,14 +30,14 @@ func NewOrderHandler(svc *erp.Service) *OrderHandler {
 // PlaceNewOrder is the gRPC handler for order creation.
 // Business context is extracted from the authenticated JWT claim stored
 // in the incoming metadata, injected into context via the auth interceptor.
-func (h *OrderHandler) PlaceNewOrder(ctx context.Context, req *PlaceOrderRequest) (*PlaceOrderResponse, error) {
+func (h *OrderHandler) PlaceNewOrder(ctx context.Context, req *orders.OrderRequest) (*orders.OrderResponse, error) {
 	// Validate required fields.
 	if len(req.Items) == 0 {
 		metrics.OrderValidationErrors.WithLabelValues("invalid_order").Inc()
 		return nil, status.Error(codes.InvalidArgument, "order must contain at least one item")
 	}
 
-	customerID, err := uuid.Parse(req.CustomerID)
+	customerID, err := uuid.Parse(req.CustomerId)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid customer_id: must be a UUID")
 	}
@@ -64,16 +66,16 @@ func (h *OrderHandler) PlaceNewOrder(ctx context.Context, req *PlaceOrderRequest
 
 	metrics.OrdersPlacedTotal.WithLabelValues(string(order.Source)).Inc()
 
-	return &PlaceOrderResponse{
-		OrderID:        order.ID.String(),
-		Status:         string(order.Status),
+	return &orders.OrderResponse{
+		OrderId:         order.ID.String(),
+		Status:          string(order.Status),
 		ConfirmationMsg: "Order placed successfully. Total: " + order.TotalPrice.String(),
-		TotalPrice:     order.TotalPrice.InexactFloat64(),
+		TotalPrice:      order.TotalPrice.InexactFloat64(),
 	}, nil
 }
 
-func (h *OrderHandler) GetOrderStatus(ctx context.Context, req *GetOrderStatusRequest) (*GetOrderStatusResponse, error) {
-	id, err := uuid.Parse(req.OrderID)
+func (h *OrderHandler) GetOrderStatus(ctx context.Context, req *orders.StatusRequest) (*orders.StatusResponse, error) {
+	id, err := uuid.Parse(req.OrderId)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid order_id")
 	}
@@ -83,14 +85,14 @@ func (h *OrderHandler) GetOrderStatus(ctx context.Context, req *GetOrderStatusRe
 		return nil, mapDomainError(err)
 	}
 
-	return &GetOrderStatusResponse{
-		OrderID: order.ID.String(),
+	return &orders.StatusResponse{
+		OrderId: order.ID.String(),
 		Status:  string(order.Status),
 	}, nil
 }
 
-func (h *OrderHandler) GetOrderDetails(ctx context.Context, req *GetOrderDetailsRequest) (*GetOrderDetailsResponse, error) {
-	id, err := uuid.Parse(req.OrderID)
+func (h *OrderHandler) GetOrderDetails(ctx context.Context, req *orders.DetailsRequest) (*orders.DetailsResponse, error) {
+	id, err := uuid.Parse(req.OrderId)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, "invalid order_id")
 	}
@@ -100,9 +102,9 @@ func (h *OrderHandler) GetOrderDetails(ctx context.Context, req *GetOrderDetails
 		return nil, mapDomainError(err)
 	}
 
-	items := make([]*OrderLineItemDetail, len(order.Items))
+	items := make([]*orders.OrderLineItemDetail, len(order.Items))
 	for i, it := range order.Items {
-		items[i] = &OrderLineItemDetail{
+		items[i] = &orders.OrderLineItemDetail{
 			Sku:       it.SKU,
 			Name:      it.Name,
 			Quantity:  it.Quantity,
@@ -110,50 +112,137 @@ func (h *OrderHandler) GetOrderDetails(ctx context.Context, req *GetOrderDetails
 		}
 	}
 
-	return &GetOrderDetailsResponse{
-		OrderID: order.ID.String(),
+	return &orders.DetailsResponse{
+		OrderId: order.ID.String(),
 		Status:  string(order.Status),
 		Total:   order.TotalPrice.InexactFloat64(),
 		Items:   items,
 	}, nil
 }
 
-// ─── Inline DTO types (replace with generated protobuf types after proto compile) ──
+// CreateProduct creates a new product catalog entry.
+func (h *OrderHandler) CreateProduct(ctx context.Context, req *orders.CreateProductRequest) (*orders.CreateProductResponse, error) {
+	if req.Sku == "" || req.Name == "" || req.Price < 0 || req.StockQty < 0 {
+		return nil, status.Error(codes.InvalidArgument, "invalid product payload")
+	}
+	p := &domain.Product{
+		SKU:         req.Sku,
+		Name:        req.Name,
+		Description: req.Description,
+		Price:       decimal.NewFromFloat(req.Price),
+		StockQty:    req.StockQty,
+	}
+	created, err := h.svc.CreateProduct(ctx, p)
+	if err != nil {
+		return nil, mapDomainError(err)
+	}
+	return &orders.CreateProductResponse{
+		Product: &orders.ProductDetail{
+			Id:          created.ID.String(),
+			Sku:         created.SKU,
+			Name:        created.Name,
+			Description: created.Description,
+			Price:       created.Price.InexactFloat64(),
+			StockQty:    created.StockQty,
+			IsActive:    created.IsActive,
+		},
+	}, nil
+}
 
-type PlaceOrderRequest struct {
-	CustomerID string
-	Source     string
-	Notes      string
-	Items      []*OrderLineItem
+// GetProductByID retrieves a product by its ID.
+func (h *OrderHandler) GetProductByID(ctx context.Context, req *orders.GetProductByIDRequest) (*orders.GetProductByIDResponse, error) {
+	id, err := uuid.Parse(req.ProductId)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid product_id UUID")
+	}
+	product, err := h.svc.GetProductByID(ctx, id)
+	if err != nil {
+		return nil, mapDomainError(err)
+	}
+	return &orders.GetProductByIDResponse{
+		Product: &orders.ProductDetail{
+			Id:          product.ID.String(),
+			Sku:         product.SKU,
+			Name:        product.Name,
+			Description: product.Description,
+			Price:       product.Price.InexactFloat64(),
+			StockQty:    product.StockQty,
+			IsActive:    product.IsActive,
+		},
+	}, nil
 }
-type OrderLineItem struct {
-	Sku      string
-	Quantity int32
+
+// ListProducts retrieves all active products.
+func (h *OrderHandler) ListProducts(ctx context.Context, req *orders.ListProductsRequest) (*orders.ListProductsResponse, error) {
+	products, err := h.svc.ListProducts(ctx)
+	if err != nil {
+		return nil, mapDomainError(err)
+	}
+	resp := &orders.ListProductsResponse{
+		Products: make([]*orders.ProductDetail, len(products)),
+	}
+	for i, p := range products {
+		resp.Products[i] = &orders.ProductDetail{
+			Id:          p.ID.String(),
+			Sku:         p.SKU,
+			Name:        p.Name,
+			Description: p.Description,
+			Price:       p.Price.InexactFloat64(),
+			StockQty:    p.StockQty,
+			IsActive:    p.IsActive,
+		}
+	}
+	return resp, nil
 }
-type PlaceOrderResponse struct {
-	OrderID         string
-	Status          string
-	ConfirmationMsg string
-	TotalPrice      float64
+
+// ListOrdersByCustomer retrieves all orders placed by a specific customer.
+func (h *OrderHandler) ListOrdersByCustomer(ctx context.Context, req *orders.ListOrdersByCustomerRequest) (*orders.ListOrdersByCustomerResponse, error) {
+	customerID, err := uuid.Parse(req.CustomerId)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid customer_id UUID")
+	}
+	ordersList, err := h.svc.ListOrdersByCustomer(ctx, customerID)
+	if err != nil {
+		return nil, mapDomainError(err)
+	}
+	resp := &orders.ListOrdersByCustomerResponse{
+		Orders: make([]*orders.OrderSummary, len(ordersList)),
+	}
+	for i, o := range ordersList {
+		resp.Orders[i] = &orders.OrderSummary{
+			OrderId:    o.ID.String(),
+			CustomerId: o.CustomerID.String(),
+			TotalPrice: o.TotalPrice.InexactFloat64(),
+			Status:      string(o.Status),
+			Source:      string(o.Source),
+			Notes:       o.Notes,
+			CreatedAt:   o.CreatedAt.Format(time.RFC3339),
+		}
+	}
+	return resp, nil
 }
-type GetOrderStatusRequest struct{ OrderID string }
-type GetOrderStatusResponse struct {
-	OrderID           string
-	Status            string
-	EstimatedDelivery string
-}
-type GetOrderDetailsRequest struct{ OrderID string }
-type OrderLineItemDetail struct {
-	Sku       string
-	Name      string
-	Quantity  int32
-	UnitPrice float64
-}
-type GetOrderDetailsResponse struct {
-	OrderID string
-	Status  string
-	Total   float64
-	Items   []*OrderLineItemDetail
+
+// UpdateOrderStatus updates the status of an existing order.
+func (h *OrderHandler) UpdateOrderStatus(ctx context.Context, req *orders.UpdateOrderStatusRequest) (*orders.UpdateOrderStatusResponse, error) {
+	orderID, err := uuid.Parse(req.OrderId)
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid order_id UUID")
+	}
+	o, err := h.svc.UpdateOrderStatus(ctx, orderID, domain.OrderStatus(req.Status))
+	if err != nil {
+		return nil, mapDomainError(err)
+	}
+	return &orders.UpdateOrderStatusResponse{
+		Order: &orders.OrderSummary{
+			OrderId:    o.ID.String(),
+			CustomerId: o.CustomerID.String(),
+			TotalPrice: o.TotalPrice.InexactFloat64(),
+			Status:      string(o.Status),
+			Source:      string(o.Source),
+			Notes:       o.Notes,
+			CreatedAt:   o.CreatedAt.Format(time.RFC3339),
+		},
+	}, nil
 }
 
 // ─── Error mapping ────────────────────────────────────────────────────────────
@@ -178,5 +267,3 @@ func mapDomainError(err error) error {
 	}
 }
 
-// ensure repository import used via ExecWithTenant in tests.
-var _ = repository.WithBusinessID

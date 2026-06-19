@@ -23,7 +23,23 @@ service OrderService {
 
   // GetOrderDetails fetches line-item history for dispute resolution context.
   rpc GetOrderDetails (DetailsRequest) returns (DetailsResponse);
+
+  // CreateProduct creates a new product catalog entry.
+  rpc CreateProduct (CreateProductRequest) returns (CreateProductResponse);
+
+  // GetProductByID retrieves a product by its ID.
+  rpc GetProductByID (GetProductByIDRequest) returns (GetProductByIDResponse);
+
+  // ListProducts retrieves all active products.
+  rpc ListProducts (ListProductsRequest) returns (ListProductsResponse);
+
+  // ListOrdersByCustomer retrieves all orders placed by a specific customer.
+  rpc ListOrdersByCustomer (ListOrdersByCustomerRequest) returns (ListOrdersByCustomerResponse);
+
+  // UpdateOrderStatus updates the status of an existing order.
+  rpc UpdateOrderStatus (UpdateOrderStatusRequest) returns (UpdateOrderStatusResponse);
 }
+
 
 // ─── Request / Response Messages ─────────────────────────────────────────────
 
@@ -73,3 +89,67 @@ message DetailsResponse {
   double total     = 3;
   repeated OrderLineItemDetail items = 4;
 }
+
+message ProductDetail {
+  string id          = 1;
+  string sku         = 2;
+  string name        = 3;
+  string description = 4;
+  double price       = 5;
+  int32  stock_qty   = 6;
+  bool   is_active   = 7;
+}
+
+message CreateProductRequest {
+  string sku         = 1;
+  string name        = 2;
+  string description = 3;
+  double price       = 4;
+  int32  stock_qty   = 5;
+}
+
+message CreateProductResponse {
+  ProductDetail product = 1;
+}
+
+message GetProductByIDRequest {
+  string product_id = 1;
+}
+
+message GetProductByIDResponse {
+  ProductDetail product = 1;
+}
+
+message ListProductsRequest {}
+
+message ListProductsResponse {
+  repeated ProductDetail products = 1;
+}
+
+message ListOrdersByCustomerRequest {
+  string customer_id = 1;
+}
+
+message OrderSummary {
+  string order_id    = 1;
+  string customer_id = 2;
+  double total_price = 3;
+  string status      = 4;
+  string source      = 5;
+  string notes       = 6;
+  string created_at  = 7;
+}
+
+message ListOrdersByCustomerResponse {
+  repeated OrderSummary orders = 1;
+}
+
+message UpdateOrderStatusRequest {
+  string order_id = 1;
+  string status   = 2;
+}
+
+message UpdateOrderStatusResponse {
+  OrderSummary order = 1;
+}
+

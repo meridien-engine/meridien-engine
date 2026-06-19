@@ -31,7 +31,11 @@ This document tracks the implementation progress of the **Meridien Engine** modu
 - [x] Defined [orders.proto](file:///media/muhammad/FS/2026/meridien-engine/backend/api/proto/orders.proto) for order operations.
 - [x] Defined [synapse.proto](file:///media/muhammad/FS/2026/meridien-engine/backend/api/proto/synapse.proto) for customer identity and interaction tracing.
 - [x] Defined [knowledge.proto](file:///media/muhammad/FS/2026/meridien-engine/backend/api/proto/knowledge.proto) for document indexing/RAG queries.
+- [x] Installed `protoc` and the Go protoc plugins locally.
+- [x] Compiled protobuf definitions into real Go gRPC stubs inside `internal/gen/`.
+- [x] Refactored all simulated gRPC handlers in `internal/grpchandler` to implement the real generated gRPC interfaces and consume/expose all domain operations.
 - [x] Scaffolded backend directory structure, Go module dependencies, and Docker build setup.
+
 
 ### **Phase 3: ERP Transaction Service & Order Verification**
 - [x] Implemented domain errors and invariants.

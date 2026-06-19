@@ -17,7 +17,11 @@ option go_package = "github.com/meridien-engine/meridien-engine/internal/gen/syn
 service SynapseService {
   rpc GetCustomerProfile  (ProfileRequest)     returns (ProfileResponse);
   rpc RecordInteraction   (InteractionRecord)  returns (InteractionResponse);
+  rpc GetCustomerByID     (GetCustomerByIDRequest) returns (GetCustomerByIDResponse);
+  rpc UpdateCustomerTier  (UpdateCustomerTierRequest) returns (UpdateCustomerTierResponse);
+  rpc ListInteractionsByCustomer (ListInteractionsByCustomerRequest) returns (ListInteractionsByCustomerResponse);
 }
+
 
 // ─── Profile Resolution ───────────────────────────────────────────────────────
 
@@ -66,3 +70,43 @@ message InteractionResponse {
   string interaction_id = 1;
   bool   success        = 2;
 }
+
+message GetCustomerByIDRequest {
+  string customer_id = 1;
+}
+
+message GetCustomerByIDResponse {
+  string customer_id      = 1;
+  string unified_name     = 2;
+  string customer_tier    = 3;
+  string semantic_summary = 4;
+}
+
+message UpdateCustomerTierRequest {
+  string customer_id = 1;
+  string tier        = 2;
+}
+
+message UpdateCustomerTierResponse {
+  bool success = 1;
+}
+
+message InteractionLogSummary {
+  string interaction_id = 1;
+  string customer_id    = 2;
+  string channel        = 3;
+  string inbound_msg    = 4;
+  string outbound_msg   = 5;
+  int32  tokens_used    = 6;
+  int32  latency_ms     = 7;
+  string created_at     = 8;
+}
+
+message ListInteractionsByCustomerRequest {
+  string customer_id = 1;
+}
+
+message ListInteractionsByCustomerResponse {
+  repeated InteractionLogSummary logs = 1;
+}
+

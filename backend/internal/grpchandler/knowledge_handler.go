@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/meridien-engine/meridien-engine/internal/domain"
+	"github.com/meridien-engine/meridien-engine/internal/gen/knowledge"
 	"github.com/meridien-engine/meridien-engine/internal/metrics"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -14,6 +15,7 @@ import (
 
 // KnowledgeHandler implements the gRPC KnowledgeService server interface.
 type KnowledgeHandler struct {
+	knowledge.UnimplementedKnowledgeServiceServer
 	repo      domain.KnowledgeRepository
 	embedFunc EmbedFunc
 }
@@ -27,7 +29,7 @@ func NewKnowledgeHandler(repo domain.KnowledgeRepository, embed EmbedFunc) *Know
 }
 
 // QueryKnowledge performs a vector similarity search for Mera's RAG step.
-func (h *KnowledgeHandler) QueryKnowledge(ctx context.Context, req *QueryKnowledgeRequest) (*QueryKnowledgeResponse, error) {
+func (h *KnowledgeHandler) QueryKnowledge(ctx context.Context, req *knowledge.KnowledgeQuery) (*knowledge.KnowledgeResult, error) {
 	if req.QueryText == "" {
 		return nil, status.Error(codes.InvalidArgument, "query_text is required")
 	}
@@ -55,12 +57,12 @@ func (h *KnowledgeHandler) QueryKnowledge(ctx context.Context, req *QueryKnowled
 
 	metrics.RAGChunksReturned.Observe(float64(len(chunks)))
 
-	resp := &QueryKnowledgeResponse{
-		Chunks: make([]*KnowledgeChunkDTO, len(chunks)),
+	resp := &knowledge.KnowledgeResult{
+		Chunks: make([]*knowledge.KnowledgeChunk, len(chunks)),
 	}
 	for i, c := range chunks {
-		resp.Chunks[i] = &KnowledgeChunkDTO{
-			NodeID:  c.NodeID.String(),
+		resp.Chunks[i] = &knowledge.KnowledgeChunk{
+			NodeId:  c.NodeID.String(),
 			Source:  c.Source,
 			Content: c.Content,
 			Score:   c.Score,
@@ -71,7 +73,7 @@ func (h *KnowledgeHandler) QueryKnowledge(ctx context.Context, req *QueryKnowled
 
 // IngestDocument chunks, embeds, and stores a merchant document.
 // Called after a merchant uploads a PDF or FAQ from the portal.
-func (h *KnowledgeHandler) IngestDocument(ctx context.Context, req *IngestDocumentRequest) (*IngestDocumentResponse, error) {
+func (h *KnowledgeHandler) IngestDocument(ctx context.Context, req *knowledge.IngestRequest) (*knowledge.IngestResponse, error) {
 	if req.SourceName == "" || req.Content == "" {
 		return nil, status.Error(codes.InvalidArgument, "source_name and content are required")
 	}
@@ -91,7 +93,7 @@ func (h *KnowledgeHandler) IngestDocument(ctx context.Context, req *IngestDocume
 		created++
 	}
 
-	return &IngestDocumentResponse{ChunksCreated: int32(created), Success: true}, nil
+	return &knowledge.IngestResponse{ChunksCreated: int32(created), Success: true}, nil
 }
 
 // ─── chunking helper ──────────────────────────────────────────────────────────
@@ -113,30 +115,3 @@ func chunkText(text string, size, overlap int) []string {
 	return chunks
 }
 
-// ─── DTO types ────────────────────────────────────────────────────────────────
-
-type QueryKnowledgeRequest struct {
-	QueryText string
-	TopK      int32
-}
-
-type KnowledgeChunkDTO struct {
-	NodeID  string
-	Source  string
-	Content string
-	Score   float64
-}
-
-type QueryKnowledgeResponse struct {
-	Chunks []*KnowledgeChunkDTO
-}
-
-type IngestDocumentRequest struct {
-	SourceName string
-	Content    string
-}
-
-type IngestDocumentResponse struct {
-	ChunksCreated int32
-	Success       bool
-}

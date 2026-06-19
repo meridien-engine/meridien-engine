@@ -79,3 +79,19 @@ func (s *Service) GetInteractionTrace(
 func (s *Service) ListInteractions(ctx context.Context, limit, offset int32) ([]domain.InteractionLog, error) {
 	return s.interactions.List(ctx, limit, offset)
 }
+
+// GetCustomerByID retrieves a customer profile by ID.
+func (s *Service) GetCustomerByID(ctx context.Context, id uuid.UUID) (*domain.CustomerProfile, error) {
+	return s.customers.GetByID(ctx, id)
+}
+
+// UpdateCustomerTier updates the customer tier.
+func (s *Service) UpdateCustomerTier(ctx context.Context, id uuid.UUID, tier domain.CustomerTier) error {
+	return s.customers.UpdateTier(ctx, id, tier)
+}
+
+// ListInteractionsByCustomer retrieves all interactions for a specific customer.
+func (s *Service) ListInteractionsByCustomer(ctx context.Context, customerID uuid.UUID) ([]domain.InteractionLog, error) {
+	return s.interactions.ListByCustomer(ctx, customerID)
+}
+
