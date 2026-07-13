@@ -60,7 +60,7 @@ jobs:
       - name: Set up sqlc
         uses: sqlc-dev/setup-sqlc@v4
         with:
-          version: '1.31.1'
+          sqlc-version: '1.31.1'
 
       - name: Verify sqlc is up to date
         working-directory: backend
