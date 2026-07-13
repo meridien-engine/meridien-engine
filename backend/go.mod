@@ -16,7 +16,10 @@ require (
 	google.golang.org/grpc v1.81.1
 )
 
-require google.golang.org/protobuf v1.36.11
+require (
+	github.com/sqlc-dev/pqtype v0.3.0
+	google.golang.org/protobuf v1.36.11
+)
 
 require (
 	github.com/beorn7/perks v1.0.1 // indirect

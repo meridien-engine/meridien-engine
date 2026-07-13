@@ -106,11 +106,11 @@ func (r *InteractionRepository) GetWithTrace(
 		RawAgentThoughts: row.RawAgentThoughts.String,
 	}
 
-	if row.RetrievedContexts != nil {
-		_ = json.Unmarshal(row.RetrievedContexts, &trace.RetrievedContexts)
+	if row.RetrievedContexts.Valid {
+		_ = json.Unmarshal(row.RetrievedContexts.RawMessage, &trace.RetrievedContexts)
 	}
-	if row.ToolsCalled != nil {
-		_ = json.Unmarshal(row.ToolsCalled, &trace.ToolsCalled)
+	if row.ToolsCalled.Valid {
+		_ = json.Unmarshal(row.ToolsCalled.RawMessage, &trace.ToolsCalled)
 	}
 
 	return log, trace, nil
