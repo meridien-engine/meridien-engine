@@ -1,0 +1,201 @@
+# Meridien Engine — API Specification & Developer Guide
+
+This document details the interface contracts, authentication patterns, and payload formats for the HTTP REST and gRPC service layers of the Meridien Engine.
+
+---
+
+## 1. Authentication & Multi-Tenancy Scoping
+
+Meridien Engine enforces strict multi-tenant data isolation at the database Row-Level Security (RLS) layer. To satisfy this, all API requests must propagate authentication and tenant context.
+
+### A. HTTP REST Authentication
+Inbound HTTP requests to protected routes must include a scoped JWT in the `Authorization` header:
+```http
+Authorization: Bearer <scoped_token_value>
+```
+The token payload contains the UUID identifier of the merchant business:
+```json
+{
+  "user_id": "8a3d5b24-9132-47ac-a128-cf1a80ad51a2",
+  "business_id": "7f13dbf6-52c6-47b2-bd74-e869c0d12a32",
+  "role": "owner",
+  "type": "scoped",
+  "exp": 1783935600
+}
+```
+
+### B. gRPC Metadata Context
+For internal microservice or handler-to-handler gRPC communication, the tenant context is transmitted as metadata using the key `business-id`:
+```text
+business-id: 7f13dbf6-52c6-47b2-bd74-e869c0d12a32
+```
+The gRPC interceptor (`TenantInterceptor`) resolves this metadata and binds it to the active transaction session.
+
+---
+
+## 2. HTTP REST API Reference
+
+### A. Mera Conversational Gateway
+
+#### `POST /api/v1/mera/webhook`
+Receives customer chats (e.g., from WhatsApp webhook integrations) and executes the ADK reasoning graph.
+
+*   **Authorization**: Scoped JWT required.
+*   **Request Headers**:
+    ```http
+    Content-Type: application/json
+    Authorization: Bearer <scoped_token>
+    ```
+*   **Request Body**:
+    ```json
+    {
+      "channel": "whatsapp",
+      "channel_external_id": "+1234567890",
+      "message": "I want to purchase 2 units of WIDGET-01",
+      "expected_price": 49.99
+    }
+    ```
+*   **Success Response** (HTTP 200):
+    ```json
+    {
+      "reply": "Your order for 2x WIDGET-01 has been placed successfully.",
+      "customer_id": "9a38ef21-14c1-4bda-bd89-813d0a20a45b",
+      "is_new": false
+    }
+    ```
+*   **Suspended Response (Price Mismatch / Exceptions)** (HTTP 200):
+    ```json
+    {
+      "reply": "The price you requested ($49.99) does not match our catalog price ($99.99). Our team is reviewing this order.",
+      "customer_id": "9a38ef21-14c1-4bda-bd89-813d0a20a45b",
+      "is_new": false
+    }
+    ```
+
+---
+
+### B. System Diagnostics & Observability
+
+#### `GET /healthz`
+Service liveness check. Always returns HTTP 200 if the server process is running.
+```json
+{
+  "status": "ok",
+  "version": "dev"
+}
+```
+
+#### `GET /readyz`
+Service readiness check. Returns HTTP 200 only when PostgreSQL is reachable.
+```json
+{
+  "status": "ok",
+  "checks": {
+    "postgres": "ok"
+  }
+}
+```
+
+#### `GET /metrics`
+Exposes system operational metrics in Prometheus exposition format.
+```text
+# HELP HTTPRequestsTotal Total number of HTTP requests processed.
+# TYPE HTTPRequestsTotal counter
+HTTPRequestsTotal{method="POST",path="/api/v1/mera/webhook",status="200"} 12
+```
+
+---
+
+## 3. gRPC Service Reference
+
+### A. Order Service (`orders.proto`)
+Handles customer inventory transactions, catalog verification, and order retrieval.
+
+```protobuf
+service OrderService {
+  rpc PlaceNewOrder (OrderRequest) returns (OrderResponse);
+  rpc GetOrderStatus (StatusRequest) returns (StatusResponse);
+  rpc GetOrderDetails (DetailsRequest) returns (DetailsResponse);
+}
+```
+
+#### `PlaceNewOrder`
+*   **Input Message (`OrderRequest`)**:
+    ```json
+    {
+      "customer_id": "9a38ef21-14c1-4bda-bd89-813d0a20a45b",
+      "items": [
+        {
+          "sku": "WIDGET-01",
+          "quantity": 2
+        }
+      ]
+    }
+    ```
+*   **Output Message (`OrderResponse`)**:
+    ```json
+    {
+      "order_id": "3d5f81ae-281b-41ca-be89-c4d32029a1b9",
+      "status": "completed",
+      "confirmation_msg": "Order settled"
+    }
+    ```
+
+---
+
+### B. Synapse Identity Service (`synapse.proto`)
+Manages the Unified Customer Model (UCM) and registers customer message telemetry.
+
+```protobuf
+service SynapseService {
+  rpc GetCustomerProfile (ProfileRequest) returns (ProfileResponse);
+  rpc RecordInteraction (InteractionRecord) returns (InteractionResponse);
+}
+```
+
+#### `GetCustomerProfile`
+*   **Input Message (`ProfileRequest`)**:
+    ```json
+    {
+      "channel_type": "whatsapp",
+      "channel_external_id": "+1234567890"
+    }
+    ```
+*   **Output Message (`ProfileResponse`)**:
+    ```json
+    {
+      "customer_id": "9a38ef21-14c1-4bda-bd89-813d0a20a45b",
+      "unified_name": "Test Customer",
+      "customer_tier": "standard",
+      "semantic_summary": "Customer frequently asks about widget availability."
+    }
+    ```
+
+---
+
+### C. Knowledge Service (`knowledge.proto`)
+Powers semantic document indexing and pgvector vector search retrieval.
+
+```protobuf
+service KnowledgeService {
+  rpc QueryKnowledge (KnowledgeQuery) returns (KnowledgeResult);
+  rpc IngestDocument (IngestRequest) returns (IngestResponse);
+}
+```
+
+#### `IngestDocument`
+Invokes the **LLM-Based Semantic Chunker** (with naive overlapping fallback) to segment a text document, generate vector embeddings, and store them.
+*   **Input Message (`IngestRequest`)**:
+    ```json
+    {
+      "source_name": "shipping_policy.txt",
+      "content": "Free shipping is available for all orders totaling $70 or more. Under $70, standard shipping is $5. Deliveries take 3-5 business days."
+    }
+    ```
+*   **Output Message (`IngestResponse`)**:
+    ```json
+    {
+      "chunks_created": 2,
+      "success": true
+    }
+    ```
