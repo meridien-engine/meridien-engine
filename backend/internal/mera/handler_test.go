@@ -275,3 +275,151 @@ func TestWebhookHandler_BadRequest(t *testing.T) {
 		t.Errorf("expected status 400, got %d", rr.Code)
 	}
 }
+
+func TestWebhookHandler_MetaVerification(t *testing.T) {
+	custRepo := &mockCustomerRepo{profiles: make(map[string]*domain.CustomerProfile)}
+	intRepo := &mockInteractionRepo{}
+	synSvc := synapse.NewService(custRepo, intRepo)
+	pRepo := &mockProductRepo{}
+	oRepo := &mockOrderRepo{}
+	erpSvc := erp.NewService(pRepo, oRepo)
+	kRepo := &mockKnowledgeRepo{}
+
+	h, err := mera.NewHandler(&agent.MockLLM{}, synSvc, erpSvc, pRepo, kRepo)
+	if err != nil {
+		t.Fatalf("failed to create handler: %v", err)
+	}
+
+	t.Setenv("META_VERIFY_TOKEN", "custom_secret_token")
+
+	// 1. Success verification handshake
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/mera/webhook?hub.mode=subscribe&hub.verify_token=custom_secret_token&hub.challenge=test_challenge_123", nil)
+	rr := httptest.NewRecorder()
+	h.Webhook(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Errorf("expected status 200, got %d", rr.Code)
+	}
+	if rr.Body.String() != "test_challenge_123" {
+		t.Errorf("expected challenge string back, got %q", rr.Body.String())
+	}
+
+	// 2. Forbidden verification (invalid token)
+	reqForbidden := httptest.NewRequest(http.MethodGet, "/api/v1/mera/webhook?hub.mode=subscribe&hub.verify_token=wrong_token&hub.challenge=test_challenge_123", nil)
+	rrForbidden := httptest.NewRecorder()
+	h.Webhook(rrForbidden, reqForbidden)
+
+	if rrForbidden.Code != http.StatusForbidden {
+		t.Errorf("expected status 403, got %d", rrForbidden.Code)
+	}
+}
+
+func TestWebhookHandler_MetaMessengerPayload(t *testing.T) {
+	custRepo := &mockCustomerRepo{profiles: make(map[string]*domain.CustomerProfile)}
+	intRepo := &mockInteractionRepo{}
+	synSvc := synapse.NewService(custRepo, intRepo)
+	pRepo := &mockProductRepo{}
+	oRepo := &mockOrderRepo{}
+	erpSvc := erp.NewService(pRepo, oRepo)
+	kRepo := &mockKnowledgeRepo{}
+
+	h, err := mera.NewHandler(&agent.MockLLM{}, synSvc, erpSvc, pRepo, kRepo)
+	if err != nil {
+		t.Fatalf("failed to create handler: %v", err)
+	}
+
+	// Messenger nested payload
+	payload := `{
+		"object": "page",
+		"entry": [{
+			"id": "page-123",
+			"messaging": [{
+				"sender": { "id": "messenger-user-99" },
+				"recipient": { "id": "page-123" },
+				"timestamp": 12345678,
+				"message": { "mid": "mid.1", "text": "hello from messenger" }
+			}]
+		}]
+	}`
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/mera/webhook", strings.NewReader(payload))
+	req.Header.Set("Content-Type", "application/json")
+	bizID := uuid.New().String()
+	req.Header.Set("Authorization", "Bearer "+makeMockToken(bizID))
+
+	rr := httptest.NewRecorder()
+	middleware.JWTAuth(http.HandlerFunc(h.Webhook)).ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d, body: %s", rr.Code, rr.Body.String())
+	}
+
+	var resp mera.WebhookResponse
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if !strings.Contains(resp.Reply, "Mock Gemini response") {
+		t.Errorf("expected reply to contain workflow text, got %q", resp.Reply)
+	}
+}
+
+func TestWebhookHandler_MetaWhatsAppPayload(t *testing.T) {
+	custRepo := &mockCustomerRepo{profiles: make(map[string]*domain.CustomerProfile)}
+	intRepo := &mockInteractionRepo{}
+	synSvc := synapse.NewService(custRepo, intRepo)
+	pRepo := &mockProductRepo{}
+	oRepo := &mockOrderRepo{}
+	erpSvc := erp.NewService(pRepo, oRepo)
+	kRepo := &mockKnowledgeRepo{}
+
+	h, err := mera.NewHandler(&agent.MockLLM{}, synSvc, erpSvc, pRepo, kRepo)
+	if err != nil {
+		t.Fatalf("failed to create handler: %v", err)
+	}
+
+	// WhatsApp Cloud API nested payload
+	payload := `{
+		"object": "whatsapp_business_account",
+		"entry": [{
+			"id": "wa-acc-123",
+			"changes": [{
+				"value": {
+					"messaging_product": "whatsapp",
+					"metadata": { "display_phone_number": "16505551111", "phone_number_id": "phone-123" },
+					"contacts": [{ "profile": { "name": "Test User" }, "wa_id": "16505552222" }],
+					"messages": [{
+						"from": "+16505552222",
+						"id": "msg-123",
+						"timestamp": "12345678",
+						"type": "text",
+						"text": { "body": "hello from whatsapp" }
+					}]
+				},
+				"field": "messages"
+			}]
+		}]
+	}`
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/mera/webhook", strings.NewReader(payload))
+	req.Header.Set("Content-Type", "application/json")
+	bizID := uuid.New().String()
+	req.Header.Set("Authorization", "Bearer "+makeMockToken(bizID))
+
+	rr := httptest.NewRecorder()
+	middleware.JWTAuth(http.HandlerFunc(h.Webhook)).ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d, body: %s", rr.Code, rr.Body.String())
+	}
+
+	var resp mera.WebhookResponse
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if !strings.Contains(resp.Reply, "Mock Gemini response") {
+		t.Errorf("expected reply to contain workflow text, got %q", resp.Reply)
+	}
+}
+
