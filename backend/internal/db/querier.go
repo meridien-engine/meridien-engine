@@ -15,6 +15,8 @@ type Querier interface {
 	// queries/businesses.sql
 	CreateBusiness(ctx context.Context, arg CreateBusinessParams) (Business, error)
 	CreateCustomerProfile(ctx context.Context, arg CreateCustomerProfileParams) (CustomerProfile, error)
+	// Marks an interaction trace as suspended for merchant HITL review.
+	CreateHITLSuspension(ctx context.Context, arg CreateHITLSuspensionParams) (InteractionTrace, error)
 	CreateInteractionLog(ctx context.Context, arg CreateInteractionLogParams) (InteractionLog, error)
 	CreateInteractionTrace(ctx context.Context, arg CreateInteractionTraceParams) (InteractionTrace, error)
 	CreateInvitation(ctx context.Context, arg CreateInvitationParams) (Invitation, error)
@@ -33,6 +35,9 @@ type Querier interface {
 	// Primary Synapse lookup: find a customer from their external channel ID.
 	GetCustomerByChannel(ctx context.Context, arg GetCustomerByChannelParams) (CustomerProfile, error)
 	GetCustomerProfileByID(ctx context.Context, id uuid.UUID) (CustomerProfile, error)
+	// Returns all traces that are still 'pending' and have passed their TTL.
+	// Run by the background expiry checker goroutine on a ticker.
+	GetExpiredHITLSuspensions(ctx context.Context) ([]InteractionTrace, error)
 	// Fetches a single interaction log and its associated trace for Compass.
 	GetInteractionWithTrace(ctx context.Context, id uuid.UUID) (GetInteractionWithTraceRow, error)
 	GetInvitationByToken(ctx context.Context, token string) (Invitation, error)
@@ -67,6 +72,8 @@ type Querier interface {
 	SoftDeleteUser(ctx context.Context, id uuid.UUID) error
 	UpdateBusiness(ctx context.Context, arg UpdateBusinessParams) (Business, error)
 	UpdateCustomerTier(ctx context.Context, arg UpdateCustomerTierParams) (CustomerProfile, error)
+	// Resolves a HITL suspension (approved / rejected / timed_out).
+	UpdateHITLStatus(ctx context.Context, arg UpdateHITLStatusParams) (InteractionTrace, error)
 	UpdateMembershipRole(ctx context.Context, arg UpdateMembershipRoleParams) (UserBusinessMembership, error)
 	UpdateMembershipStatus(ctx context.Context, arg UpdateMembershipStatusParams) (UserBusinessMembership, error)
 	UpdateOrderStatus(ctx context.Context, arg UpdateOrderStatusParams) (Order, error)

@@ -1,4 +1,4 @@
-# Grafana datasource provisioning — auto-configures Prometheus on startup.
+# Grafana datasource provisioning — auto-configures Prometheus and Tempo on startup.
 apiVersion: 1
 
 datasources:
@@ -8,3 +8,22 @@ datasources:
     url: http://prometheus:9090
     isDefault: true
     editable: false
+
+  # Tempo receives OTEL traces from the OTEL Collector (port 4317 gRPC).
+  # Mera workflow node spans (mera.resolve_customer, mera.rag_retrieval, etc.)
+  # flow: Mera agent → OTEL Collector (4317) → Tempo (3100) → Grafana
+  - name: Tempo
+    type: tempo
+    access: proxy
+    url: http://tempo:3200
+    isDefault: false
+    editable: false
+    jsonData:
+      tracesToLogsV2:
+        datasourceUid: prometheus
+      serviceMap:
+        datasourceUid: prometheus
+      search:
+        hide: false
+      nodeGraph:
+        enabled: true

@@ -41,6 +41,8 @@ services:
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?sslmode=disable
       PORT: 8080
+      OTLP_ENDPOINT: otel-collector:4317
+      HITL_TIMEOUT_HOURS: 24
     ports:
       - "8080:8080"
     depends_on:
@@ -85,9 +87,40 @@ services:
       - ./infra/grafana/dashboards:/var/lib/grafana/dashboards:ro
     depends_on:
       - prometheus
+      - tempo
+
+  # ── Distributed Tracing ───────────────────────────────────────────────────────
+
+  # OTEL Collector: receives spans from Mera agent nodes (gRPC port 4317),
+  # and forwards them to Tempo for storage.
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.104.0
+    container_name: meridien_otel_collector
+    command: ["--config=/etc/otel-collector.yml"]
+    volumes:
+      - ./infra/otel/otel-collector.yml:/etc/otel-collector.yml:ro
+    ports:
+      - "4317:4317"   # OTLP gRPC — Mera connects here
+      - "4318:4318"   # OTLP HTTP — optional
+      - "8889:8889"   # Prometheus exporter (collector self-metrics)
+    depends_on:
+      - tempo
+
+  # Tempo: stores and indexes distributed traces ingested by the OTEL Collector.
+  tempo:
+    image: grafana/tempo:2.5.0
+    container_name: meridien_tempo
+    command: ["-config.file=/etc/tempo.yml"]
+    volumes:
+      - ./infra/tempo/tempo.yml:/etc/tempo.yml:ro
+      - tempo_data:/var/tempo
+    ports:
+      - "3200:3200"   # Grafana Tempo query API
+      - "9095:9095"   # Tempo gRPC (internal)
 
 volumes:
   postgres_data:
   redis_data:
   prometheus_data:
   grafana_data:
+  tempo_data:

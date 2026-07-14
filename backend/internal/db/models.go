@@ -86,6 +86,10 @@ type InteractionTrace struct {
 	RawAgentThoughts  string          `json:"raw_agent_thoughts"`
 	ToolsCalled       json.RawMessage `json:"tools_called"`
 	CreatedAt         time.Time       `json:"created_at"`
+	WorkflowID        sql.NullString  `json:"workflow_id"`
+	HitlStatus        string          `json:"hitl_status"`
+	SuspendedAt       sql.NullTime    `json:"suspended_at"`
+	ExpiresAt         sql.NullTime    `json:"expires_at"`
 }
 
 type Invitation struct {

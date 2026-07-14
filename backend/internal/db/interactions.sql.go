@@ -15,6 +15,43 @@ import (
 	"github.com/sqlc-dev/pqtype"
 )
 
+const createHITLSuspension = `-- name: CreateHITLSuspension :one
+UPDATE interaction_traces
+SET
+  workflow_id  = $1,
+  hitl_status  = 'pending',
+  suspended_at = NOW(),
+  expires_at   = NOW() + ($2::int * INTERVAL '1 hour')
+WHERE id = $3
+RETURNING id, interaction_log_id, retrieved_contexts, system_prompt, raw_agent_thoughts, tools_called, created_at, workflow_id, hitl_status, suspended_at, expires_at
+`
+
+type CreateHITLSuspensionParams struct {
+	WorkflowID   sql.NullString `json:"workflow_id"`
+	TimeoutHours int32          `json:"timeout_hours"`
+	TraceID      uuid.UUID      `json:"trace_id"`
+}
+
+// Marks an interaction trace as suspended for merchant HITL review.
+func (q *Queries) CreateHITLSuspension(ctx context.Context, arg CreateHITLSuspensionParams) (InteractionTrace, error) {
+	row := q.db.QueryRowContext(ctx, createHITLSuspension, arg.WorkflowID, arg.TimeoutHours, arg.TraceID)
+	var i InteractionTrace
+	err := row.Scan(
+		&i.ID,
+		&i.InteractionLogID,
+		&i.RetrievedContexts,
+		&i.SystemPrompt,
+		&i.RawAgentThoughts,
+		&i.ToolsCalled,
+		&i.CreatedAt,
+		&i.WorkflowID,
+		&i.HitlStatus,
+		&i.SuspendedAt,
+		&i.ExpiresAt,
+	)
+	return i, err
+}
+
 const createInteractionLog = `-- name: CreateInteractionLog :one
 INSERT INTO interaction_logs (
   business_id, customer_id, channel, inbound_msg, outbound_msg, tokens_used, latency_ms
@@ -65,7 +102,7 @@ INSERT INTO interaction_traces (
 ) VALUES (
   $1, $2, $3, $4, $5
 )
-RETURNING id, interaction_log_id, retrieved_contexts, system_prompt, raw_agent_thoughts, tools_called, created_at
+RETURNING id, interaction_log_id, retrieved_contexts, system_prompt, raw_agent_thoughts, tools_called, created_at, workflow_id, hitl_status, suspended_at, expires_at
 `
 
 type CreateInteractionTraceParams struct {
@@ -93,8 +130,55 @@ func (q *Queries) CreateInteractionTrace(ctx context.Context, arg CreateInteract
 		&i.RawAgentThoughts,
 		&i.ToolsCalled,
 		&i.CreatedAt,
+		&i.WorkflowID,
+		&i.HitlStatus,
+		&i.SuspendedAt,
+		&i.ExpiresAt,
 	)
 	return i, err
+}
+
+const getExpiredHITLSuspensions = `-- name: GetExpiredHITLSuspensions :many
+SELECT id, interaction_log_id, retrieved_contexts, system_prompt, raw_agent_thoughts, tools_called, created_at, workflow_id, hitl_status, suspended_at, expires_at FROM interaction_traces
+WHERE hitl_status = 'pending'
+  AND expires_at < NOW()
+`
+
+// Returns all traces that are still 'pending' and have passed their TTL.
+// Run by the background expiry checker goroutine on a ticker.
+func (q *Queries) GetExpiredHITLSuspensions(ctx context.Context) ([]InteractionTrace, error) {
+	rows, err := q.db.QueryContext(ctx, getExpiredHITLSuspensions)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []InteractionTrace{}
+	for rows.Next() {
+		var i InteractionTrace
+		if err := rows.Scan(
+			&i.ID,
+			&i.InteractionLogID,
+			&i.RetrievedContexts,
+			&i.SystemPrompt,
+			&i.RawAgentThoughts,
+			&i.ToolsCalled,
+			&i.CreatedAt,
+			&i.WorkflowID,
+			&i.HitlStatus,
+			&i.SuspendedAt,
+			&i.ExpiresAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getInteractionWithTrace = `-- name: GetInteractionWithTrace :one
@@ -111,7 +195,11 @@ SELECT
   it.retrieved_contexts,
   it.system_prompt,
   it.raw_agent_thoughts,
-  it.tools_called
+  it.tools_called,
+  it.workflow_id,
+  it.hitl_status,
+  it.suspended_at,
+  it.expires_at
 FROM interaction_logs il
 LEFT JOIN interaction_traces it ON it.interaction_log_id = il.id
 WHERE il.id = $1
@@ -131,6 +219,10 @@ type GetInteractionWithTraceRow struct {
 	SystemPrompt      sql.NullString        `json:"system_prompt"`
 	RawAgentThoughts  sql.NullString        `json:"raw_agent_thoughts"`
 	ToolsCalled       pqtype.NullRawMessage `json:"tools_called"`
+	WorkflowID        sql.NullString        `json:"workflow_id"`
+	HitlStatus        sql.NullString        `json:"hitl_status"`
+	SuspendedAt       sql.NullTime          `json:"suspended_at"`
+	ExpiresAt         sql.NullTime          `json:"expires_at"`
 }
 
 // Fetches a single interaction log and its associated trace for Compass.
@@ -151,6 +243,10 @@ func (q *Queries) GetInteractionWithTrace(ctx context.Context, id uuid.UUID) (Ge
 		&i.SystemPrompt,
 		&i.RawAgentThoughts,
 		&i.ToolsCalled,
+		&i.WorkflowID,
+		&i.HitlStatus,
+		&i.SuspendedAt,
+		&i.ExpiresAt,
 	)
 	return i, err
 }
@@ -237,4 +333,36 @@ func (q *Queries) ListInteractionLogsByCustomer(ctx context.Context, customerID 
 		return nil, err
 	}
 	return items, nil
+}
+
+const updateHITLStatus = `-- name: UpdateHITLStatus :one
+UPDATE interaction_traces
+SET hitl_status = $1
+WHERE id = $2
+RETURNING id, interaction_log_id, retrieved_contexts, system_prompt, raw_agent_thoughts, tools_called, created_at, workflow_id, hitl_status, suspended_at, expires_at
+`
+
+type UpdateHITLStatusParams struct {
+	Status  string    `json:"status"`
+	TraceID uuid.UUID `json:"trace_id"`
+}
+
+// Resolves a HITL suspension (approved / rejected / timed_out).
+func (q *Queries) UpdateHITLStatus(ctx context.Context, arg UpdateHITLStatusParams) (InteractionTrace, error) {
+	row := q.db.QueryRowContext(ctx, updateHITLStatus, arg.Status, arg.TraceID)
+	var i InteractionTrace
+	err := row.Scan(
+		&i.ID,
+		&i.InteractionLogID,
+		&i.RetrievedContexts,
+		&i.SystemPrompt,
+		&i.RawAgentThoughts,
+		&i.ToolsCalled,
+		&i.CreatedAt,
+		&i.WorkflowID,
+		&i.HitlStatus,
+		&i.SuspendedAt,
+		&i.ExpiresAt,
+	)
+	return i, err
 }

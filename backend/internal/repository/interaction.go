@@ -6,10 +6,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/meridien-engine/meridien-engine/internal/db"
 	"github.com/meridien-engine/meridien-engine/internal/domain"
+	"github.com/meridien-engine/meridien-engine/internal/mera/hitl"
 )
 
 // InteractionRepository implements domain.InteractionRepository.
@@ -101,9 +103,23 @@ func (r *InteractionRepository) GetWithTrace(
 		CreatedAt:   row.CreatedAt,
 	}
 
+	statusStr := "none"
+	if row.HitlStatus.Valid && row.HitlStatus.String != "" {
+		statusStr = row.HitlStatus.String
+	}
+
 	trace := &domain.InteractionTrace{
 		SystemPrompt:     row.SystemPrompt.String,
 		RawAgentThoughts: row.RawAgentThoughts.String,
+		WorkflowID:       row.WorkflowID.String,
+		HITLStatus:       domain.HITLStatus(statusStr),
+	}
+
+	if row.SuspendedAt.Valid {
+		trace.SuspendedAt = &row.SuspendedAt.Time
+	}
+	if row.ExpiresAt.Valid {
+		trace.ExpiresAt = &row.ExpiresAt.Time
 	}
 
 	if row.RetrievedContexts.Valid {
@@ -162,3 +178,40 @@ func (r *InteractionRepository) ListByCustomer(ctx context.Context, customerID u
 	}
 	return out, nil
 }
+
+// GetExpiredSuspensions fetches all traces that are suspended and have expired.
+// Implements hitl.HITLRepository interface.
+func (r *InteractionRepository) GetExpiredSuspensions(ctx context.Context) ([]hitl.ExpiredSuspension, error) {
+	traces, err := r.q.GetExpiredHITLSuspensions(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("get expired hitl suspensions: %w", err)
+	}
+
+	out := make([]hitl.ExpiredSuspension, len(traces))
+	for i, t := range traces {
+		var expiredAt time.Time
+		if t.ExpiresAt.Valid {
+			expiredAt = t.ExpiresAt.Time
+		}
+		out[i] = hitl.ExpiredSuspension{
+			TraceID:    t.ID,
+			WorkflowID: t.WorkflowID.String,
+			ExpiresAt:  expiredAt,
+		}
+	}
+	return out, nil
+}
+
+// MarkTimedOut resolves an expired suspension by marking it as 'timed_out'.
+// Implements hitl.HITLRepository interface.
+func (r *InteractionRepository) MarkTimedOut(ctx context.Context, traceID uuid.UUID) error {
+	_, err := r.q.UpdateHITLStatus(ctx, db.UpdateHITLStatusParams{
+		Status:  string(domain.HITLStatusTimedOut),
+		TraceID: traceID,
+	})
+	if err != nil {
+		return fmt.Errorf("mark hitl suspension timed out: %w", err)
+	}
+	return nil
+}
+

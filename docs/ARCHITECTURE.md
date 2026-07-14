@@ -1,255 +1,173 @@
-# Meridien Engine — Architecture
+# Meridien Engine — Architecture Specification (v2.0)
 
-**Version:** 1.0 (Phase 1 — ERP Core)
-**Last updated:** May 2026
+**Version:** 2.0 (Phase 5 — Unified Platform, Mera & Synapse)  
+**Last updated:** July 2026  
+**Status:** Unified Reference / Publication Ready  
 
-This document is the source of truth for architectural decisions.
-Every significant decision is recorded here before code is written.
-If something is built that isn't in this doc, the doc is wrong — update it.
-
----
-
-## System Overview
-
-Meridien Engine is a unified backend platform combining a multi-tenant ERP/CRM core
-with an AI reasoning layer. The AI observes and suggests; it never writes to business
-data directly. Humans stay in the loop on exceptions, not every message.
-
-```
-Phase 1 (now):   Clean ERP/CRM backend. Multi-tenant. Tested.
-Phase 2 (next):  AI intelligence layer — Synapse, Knowledge, Brain, Compass.
-Phase 3:         Operator surface — Compass and Meridien React frontends.
-Phase 4:         Mera live on social channels.
-Phase 5:         Scale features (branches, advanced analytics, fine-tuning).
-```
+This document serves as the unified technical specification and single source of truth for the **Meridien Engine**, a next-generation multi-tenant enterprise retail, customer relationship (Synapse), and conversational AI platform (Mera).
 
 ---
 
-## Architectural Decisions (Locked)
+## 1. System Overview & Component Mapping
 
-| Decision | Choice | Reason |
-|---|---|---|
-| Architecture style | Modular monolith | Solo engineer, no production traffic yet. Extract services when there is a measured reason. |
-| Backend language | Go | Concurrency, performance, type safety. |
-| ORM | sqlc | Type-safe Go generated from raw SQL. No magic. Full control over queries. |
-| HTTP framework | Gin | Lightweight, fast, production-ready. |
-| Database | PostgreSQL 15+ | RLS for multi-tenancy, pgvector for embeddings later. One DB. |
-| Multi-tenancy | PostgreSQL Row-Level Security | Enforced at the database layer, not just code. |
-| Cache | Redis 7+ | Token blacklist, rate limiting, event queues later. |
-| Auth | Two-token JWT (generic → scoped) | Proven in MERIDIEN v1. Users are global; business context is session-scoped. |
-| Frontend | React + TypeScript | Three apps: meridien, compass, mera. |
-| LLM provider | Claude API | Reasoning quality, prompt caching, structured output. |
-| Migrations | golang-migrate | SQL-first, explicit, reversible. |
-| Test strategy | Table-driven, 60% coverage floor, CI blocks merge below threshold. |
-| Repo structure | Monorepo | Shared types, single deploy pipeline, no version mismatch. Split when deployment cadences diverge. |
+Meridien Engine is structured as a **Modular Monolith in Go**, allowing simple deployment profiles, high-performance local function calls, and compile-time type safety. It separates high-performance transactional logic (ERP) from customer memory (Synapse) and autonomous execution (Mera).
+
+```mermaid
+graph TD
+    %% Clients
+    WhatsApp[WhatsApp / Webhooks] -->|HTTP POST| Gateway[Mera HTTP Ingestion Gateway]
+    ERP_FE[ERP React Portal] -->|HTTP REST| HTTP_Handlers
+    Compass_FE[Compass Analytics Dash] -->|HTTP REST| HTTP_Handlers
+ 
+    subgraph "Go Modular Monolith (backend)"
+        HTTP_Handlers -->|Local Call| ERP_SVC[ERP Core Service]
+        HTTP_Handlers -->|Local Call| Synapse_SVC[Synapse Service]
+ 
+        Gateway -->|Converts Msg to Input| Runner[ADK Workflow Runner]
+ 
+        subgraph "ADK v2 Graph Engine"
+            Runner --> Graph[Mera Conversation Graph]
+            Graph --> Node1[Lookup Customer Node]
+            Graph --> Node2[RAG Vector Retrieval Node]
+            Graph --> Node3[Gemini LLM Router Node]
+            Graph --> Node4[ERP Transaction Node]
+        end
+ 
+        Node1 -->|Local Service Call| Synapse_SVC
+        Node2 -->|Vector Search| Knowledge_SVC[Knowledge Vector RAG Service]
+        Node4 -->|Validate Stock / Price Check| ERP_SVC
+    end
+ 
+    subgraph "Shared PostgreSQL Database (with pgvector)"
+        DB[(PostgreSQL DB)]
+        RLS[Row-Level Security: app.current_business UUID]
+        
+        DB --> RLS
+        RLS --> Tables["- Users & memberships\n- Products & Single-Location Stock\n- Orders & Line Items\n- Customer Profiles (UCM)\n- Document Embeddings (pgvector)\n- Interaction Traces (AI Decisions)"]
+    end
+ 
+    ERP_SVC -->|SQL / pgx / SET LOCAL| DB
+    Synapse_SVC -->|SQL / pgx / SET LOCAL| DB
+    Knowledge_SVC -->|pgvector <=> Search| DB
+```
+
+### Module Subsystems
+*   **ERP Service**: Manages inventory stock counts (single-location model) and catalog details, executing checkout settlements.
+*   **Synapse Service**: Maintains the Unified Customer Model (UCM), tracking customer communication channels (WhatsApp IDs) and generating customer histories.
+*   **Knowledge Service**: Implements pgvector semantic search and structured document ingestion.
+*   **Mera Engine**: Houses the autonomous ReAct conversation graph and human-in-the-loop (HITL) suspension controllers.
 
 ---
 
-## What Is NOT Being Built in Phase 1
+## 2. Multi-Tenancy & Security Guardrails
 
-- POS (point of sale)
-- Branches / multi-location inventory
-- Any AI or LLM features
-- Frontend (backend-first)
-
-These are not cancelled — they are deferred until the foundation is solid and
-a real customer use case demands them.
-
----
-
-## Repository Structure
-
+### Row-Level Security (RLS)
+Data isolation is enforced at the PostgreSQL database layer using Row-Level Security. Every database table (excluding global `users`) has a `business_id UUID` column and an active RLS policy:
+```sql
+CREATE POLICY tenant_isolation ON products 
+  USING (business_id = current_setting('app.current_business', true)::uuid);
 ```
-meridien-engine/
-├── backend/
-│   ├── cmd/server/main.go          # Entry point + DI wiring
-│   ├── internal/
-│   │   ├── auth/                   # Auth handlers, services, JWT logic
-│   │   ├── business/               # Business, membership, join, invite
-│   │   ├── customer/               # Customer CRM
-│   │   ├── product/                # Product catalog
-│   │   ├── order/                  # Orders, line items, payments
-│   │   ├── common/                 # Shared domain logic
-│   │   └── db/                     # sqlc-generated code (do not edit manually)
-│   ├── db/
-│   │   ├── migrations/             # SQL migration files (golang-migrate)
-│   │   └── queries/                # SQL query definitions (sqlc input)
-│   ├── pkg/
-│   │   ├── middleware/             # Auth middleware, rate limiting
-│   │   ├── response/               # Standard response envelopes
-│   │   └── validate/               # Input validation helpers
-│   ├── sqlc.yaml
-│   ├── go.mod
-│   └── .env.example
-│
-├── frontend/
-│   ├── apps/
-│   │   ├── meridien/               # ERP operator interface (React + TypeScript)
-│   │   ├── compass/                # AI control panel + analytics (React + TypeScript)
-│   │   └── mera/                   # Customer-facing AI agent UI (React + TypeScript)
-│   └── packages/shared/            # Shared types, hooks, UI components
-│
-├── docs/                           # Architecture, ADRs, API contracts
-├── scripts/                        # Dev tooling, seed scripts
-├── .github/workflows/ci.yml        # CI pipeline
-├── docker-compose.yml
-├── Makefile
-└── .gitignore
-```
-
----
-
-## Database Schema (Phase 1)
-
-### Migration History
-
-| Migration | Tables | Status |
-|---|---|---|
-| 000001_core_foundation | users, business_categories, businesses, user_business_memberships, join_requests, invitations, audit_logs | ✅ |
-
-### Core Tables
-
-```
-users                       — global, no business_id
-businesses                  — multi-tenant root
-business_categories         — predefined system list (seeded)
-user_business_memberships   — user ↔ business with role
-join_requests               — user-initiated business joins
-invitations                 — admin/owner-initiated invites
-audit_logs                  — immutable append-only trail
-```
-
-Migrations 000002+ will add: customers, products, orders.
-
-### RLS Pattern
-
-Every repository operation that reads or writes business-scoped data wraps in a
-transaction that sets the business context:
-
+In Go, database operations propagate the tenant UUID via `context.Context` and execute within a transaction wrapper that sets the local session variable before calling SQL queries:
 ```go
-func businessTx(ctx context.Context, db *pgxpool.Pool, businessID uuid.UUID, fn func(pgx.Tx) error) error {
-    tx, err := db.Begin(ctx)
-    if err != nil { return err }
-    defer tx.Rollback(ctx)
-
-    if _, err := tx.Exec(ctx, "SET LOCAL app.current_business = $1", businessID); err != nil {
-        return err
-    }
-    if err := fn(tx); err != nil { return err }
-    return tx.Commit(ctx)
-}
+// repository.ExecuteWithinTenant wrapper
+_, err := tx.ExecContext(ctx, "SET LOCAL app.current_business = $1", businessID)
 ```
 
-PostgreSQL RLS policies use `current_setting('app.current_business', true)` to enforce
-row-level isolation. The `true` parameter means it returns NULL (not an error) if the
-setting is not set — important for operations that run outside business context (user
-registration, business listing).
+### Zero-Hallucination Pricing Guardrail
+To ensure the AI agent (Mera) cannot commit illegal pricing, the agent has **no ability to overwrite or dictate prices**.
+1. Mera's Graph requests checkouts by submitting only the product `SKU` and `quantity`.
+2. The ERP checkout engine queries the database catalog to resolve the true price.
+3. If the user expects a different price than the database catalog, the transaction status is marked as `pending_review` and workflow execution is suspended for manual operator approval.
 
 ---
 
-## Authentication Flow
+## 3. Mera Conversation Graph & HITL Engine
 
+Mera uses the **Google Agent Development Kit (ADK) v2** (`google.golang.org/adk/v2`) to structure agent behavior as a deterministic directed graph.
+
+```mermaid
+flowchart TD
+    Start([Inbound Msg]) --> ResolveCust[1. Resolve Customer Profile]
+    ResolveCust --> RAG[2. Knowledge RAG Retrieval]
+    RAG --> LLM[3. Gemini Intent Router]
+    
+    LLM --> Route{Route Decision}
+    Route -- "Inquiry / FAQ" --> Reply[4a. Generate Response]
+    Route -- "Checkout Order" --> ERPCheck[4b. ERP Checkout Transaction]
+    
+    ERPCheck --> SaveOrder{Order Status?}
+    SaveOrder -- "Completed" --> Reply
+    SaveOrder -- "Price Mismatch" --> Suspend[5. Suspend Workflow: HITL]
+    
+    Suspend --> Pause[6. Await Dashboard Callback]
+    Pause -.-> Resume[7. Resume Workflow on Event]
+    Resume --> Reply
+    
+    Reply --> Telemetry[8. Async Telemetry log]
+    Telemetry --> Egress([Outbound Response])
 ```
-1. POST /auth/register       → create user (no business attached)
-2. POST /auth/login          → return generic JWT { user_id, type="generic" }
-3. GET  /auth/businesses     → list businesses the user is a member of
-4. POST /auth/use-business/:id
-                             → validate active membership
-                             → return scoped JWT { user_id, business_id, role, type="scoped" }
-5. All business API calls    → require scoped JWT
-6. Switch business           → repeat from step 4
-```
 
-### JWT Token Types
-
-| Field | Generic | Scoped |
-|---|---|---|
-| type | "generic" | "scoped" |
-| user_id | ✅ | ✅ |
-| business_id | ❌ | ✅ |
-| role | ❌ | ✅ |
-| jti | ✅ | ✅ |
-
-### Token Revocation
-
-JTI stored in Redis with TTL equal to token expiry on logout.
-Redis is fail-open — the app runs normally if Redis is unavailable,
-accepting the minor security tradeoff for operational stability.
+### Human-in-the-Loop (HITL) Suspend Timeout & Escalation
+Workflows suspended on price mismatches or operational exceptions have an automatic expiration TTL monitored by a background daemon (`hitl.Checker`):
+*   **Default Timeout**: 24 hours (configurable via `HITL_TIMEOUT_HOURS`).
+*   **Two-Tier Escalation Policy**:
+    *   **Tier 1 (T+24h)**: Background daemon generates a warning notification to the merchant dashboard.
+    *   **Tier 2 (T+36h)**: Background daemon auto-rejects the suspended workflow, updates status to `timed_out`, and triggers a callback resuming the runner in the rejected branch.
 
 ---
 
-## API Conventions
+## 4. Knowledge Engine (RAG) & Semantic Chunking
 
-### Response Envelopes
+Ingesting manuals, return policies, and FAQ sheets utilizes an advanced chunking strategy to optimize vector retrieval.
 
-```json
-// Success
-{ "success": true, "message": "...", "data": {} }
+### LLM-Based Semantic Chunking (Gemini)
+Traditional character-count splitters break sentences mid-thought. Meridien Engine implements **LLM-Based Semantic Chunking** using `gemini-2.5-flash` at ingestion time:
+1. The raw text is passed to Gemini with a structured system prompt requesting splits along semantic shifts and topic transitions.
+2. The model returns a strict JSON array of strings `[]string` representing coherent segments.
+3. The segments are passed to the embedding API and saved to pgvector.
 
-// Error
-{ "success": false, "error": "SNAKE_CASE_CODE", "message": "Human-readable description" }
-
-// Paginated
-{
-  "success": true,
-  "data": [...],
-  "meta": { "total": 100, "page": 1, "per_page": 20, "total_pages": 5 }
-}
-```
-
-### REST Conventions
-
-```
-GET    /api/v1/{resource}       — list (paginated)
-GET    /api/v1/{resource}/:id   — get by ID
-POST   /api/v1/{resource}       — create
-PUT    /api/v1/{resource}/:id   — full update
-PATCH  /api/v1/{resource}/:id   — partial update
-DELETE /api/v1/{resource}/:id   — soft delete (sets deleted_at)
-```
-
-### Layering
-
-```
-Handler  — parse request, call service, format response. No business logic.
-Service  — business logic, orchestration, validation. No SQL.
-DB (sqlc) — type-safe generated queries. No business logic.
+### Naive Overlapping Fallback
+To safeguard ingestion against network dropouts or LLM limits, a naive overlapping splitter acts as an automatic fallback:
+```go
+// Fallback triggered if semanticChunkText returns an error
+chunks = chunkText(req.Content, 512, 64)
 ```
 
 ---
 
-## Role Set
+## 5. Observability & Telemetry
 
-| Role | Capabilities |
-|---|---|
-| owner | Everything. Immutable. Auto-assigned at business creation. |
-| admin | Approve joins, invite users, manage all business data. |
-| manager | Manage products, orders, customers. |
-| viewer | Read-only. |
+### Operational Metrics (Prometheus)
+A dedicated metrics registry ([backend/internal/metrics/metrics.go](file:///media/muhammad/FS/2026/meridien-engine/backend/internal/metrics/metrics.go)) exposes standard Prometheus metrics at `/metrics`:
+*   `AgentTurnsTotal` / `AgentLatency`: Conversation execution tracking.
+*   `LLMTokensUsed`: Inbound and outbound token consumption.
+*   `RAGQueryDuration` / `RAGChunksReturned`: Vector database retrieval tracking.
 
----
-
-## Security
-
-| Concern | Implementation |
-|---|---|
-| Passwords | bcrypt, cost 12 |
-| JWT | HS256, 24h expiry, unique JTI per token |
-| Token revocation | JTI in Redis with TTL on logout |
-| Rate limiting | Fixed-window per IP on auth endpoints |
-| Data isolation | PostgreSQL RLS + SET LOCAL per transaction |
-| SQL injection | sqlc prepared statements — no raw string interpolation |
-| Soft deletes | deleted_at on all business entities |
+### Tracing (OpenTelemetry & Tempo)
+Every ADK workflow node runs wrapped with OpenTelemetry spans (`withTrace`), propagating the active `business_id` metadata. This allows developers to trace conversational execution graphs from webhooks down to the database query level inside Grafana Tempo:
+```go
+ctx, span := otel.Tracer("mera").Start(ctx, "node.rag_retrieval")
+```
+Required trace nodes: `mera.resolve_customer`, `mera.rag_retrieval`, `mera.erp_checkout`, `mera.llm_route`, `mera.hitl_suspend`.
 
 ---
 
-## What the Old Codebase (MERIDIEN v1) Taught Us
+## 6. Authentication Flows
 
-| Lesson | What We're Doing Differently |
-|---|---|
-| POS and branches were built before any customer needed them | Phase 1 has neither. They come back when a real use case demands them. |
-| GORM hides SQL and makes complex queries awkward | sqlc: write the SQL you know, get clean Go back. |
-| No test coverage is serious debt | 60% coverage floor enforced by CI from day one. |
-| Flutter was the wrong frontend choice for a B2B SaaS | React + TypeScript across all three frontends. |
-| Architecture doc lagged behind the code | This doc is written before code. It is the source of truth. |
-| No CI until late | GitHub Actions CI configured in Phase 1, never turned off. |
+Meridien Engine utilizes a **two-token JWT authentication flow** to isolate global identities from active business sessions.
+
+```text
+[Registration/Login]
+1. POST /auth/register    → Register generic credentials
+2. POST /auth/login       → Return generic JWT { user_id, type: "generic" }
+
+[Session Scoping]
+3. GET  /auth/businesses  → Retrieve businesses where user has membership
+4. POST /auth/use-business/:id 
+                          → Verify permissions
+                          → Return scoped JWT { user_id, business_id, role, type: "scoped" }
+
+[Application Scope]
+5. API Handlers           → Accept ONLY scoped JWT
+```
+*   **gRPC Handlers**: Use a server unary interceptor (`TenantInterceptor`) extracting metadata credentials and injecting them into the context via `repository.WithBusinessID`.

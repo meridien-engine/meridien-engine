@@ -1,0 +1,49 @@
+# OTEL Collector configuration for Meridien Engine
+# Receives spans from Mera agent nodes and forwards to Grafana Tempo.
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
+    timeout: 1s
+    send_batch_size: 1024
+
+  # Drop spans with no service name to avoid noise.
+  filter/service:
+    error_mode: ignore
+    traces:
+      span:
+        - 'resource.attributes["service.name"] == nil'
+
+exporters:
+  # Forward all traces to Tempo via OTLP gRPC.
+  otlp/tempo:
+    endpoint: tempo:9095
+    tls:
+      insecure: true
+
+  # Expose collector self-metrics to Prometheus.
+  prometheus:
+    endpoint: "0.0.0.0:8889"
+
+  # Debug: log spans to stdout in dev (disable in prod).
+  debug:
+    verbosity: normal
+
+service:
+  pipelines:
+    traces:
+      receivers:  [otlp]
+      processors: [batch, filter/service]
+      exporters:  [otlp/tempo, debug]
+
+    metrics:
+      receivers:  [otlp]
+      processors: [batch]
+      exporters:  [prometheus]

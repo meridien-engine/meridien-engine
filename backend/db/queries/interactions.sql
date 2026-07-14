@@ -29,7 +29,11 @@ SELECT
   it.retrieved_contexts,
   it.system_prompt,
   it.raw_agent_thoughts,
-  it.tools_called
+  it.tools_called,
+  it.workflow_id,
+  it.hitl_status,
+  it.suspended_at,
+  it.expires_at
 FROM interaction_logs il
 LEFT JOIN interaction_traces it ON it.interaction_log_id = il.id
 WHERE il.id = $1;
@@ -44,3 +48,28 @@ LIMIT sqlc.arg(lim) OFFSET sqlc.arg(off);
 SELECT * FROM interaction_logs
 WHERE customer_id = $1
 ORDER BY created_at DESC;
+
+-- name: CreateHITLSuspension :one
+-- Marks an interaction trace as suspended for merchant HITL review.
+UPDATE interaction_traces
+SET
+  workflow_id  = sqlc.arg(workflow_id),
+  hitl_status  = 'pending',
+  suspended_at = NOW(),
+  expires_at   = NOW() + (sqlc.arg(timeout_hours)::int * INTERVAL '1 hour')
+WHERE id = sqlc.arg(trace_id)
+RETURNING *;
+
+-- name: GetExpiredHITLSuspensions :many
+-- Returns all traces that are still 'pending' and have passed their TTL.
+-- Run by the background expiry checker goroutine on a ticker.
+SELECT * FROM interaction_traces
+WHERE hitl_status = 'pending'
+  AND expires_at < NOW();
+
+-- name: UpdateHITLStatus :one
+-- Resolves a HITL suspension (approved / rejected / timed_out).
+UPDATE interaction_traces
+SET hitl_status = sqlc.arg(status)
+WHERE id = sqlc.arg(trace_id)
+RETURNING *;

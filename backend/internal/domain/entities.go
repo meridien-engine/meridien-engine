@@ -143,12 +143,28 @@ type ToolCall struct {
 	ResultJSON string
 }
 
+// HITLStatus represents the merchant review state for a suspended workflow.
+type HITLStatus string
+
+const (
+	HITLStatusNone     HITLStatus = "none"
+	HITLStatusPending  HITLStatus = "pending"
+	HITLStatusApproved HITLStatus = "approved"
+	HITLStatusRejected HITLStatus = "rejected"
+	HITLStatusTimedOut HITLStatus = "timed_out"
+)
+
 type InteractionTrace struct {
-	ID               uuid.UUID
-	InteractionLogID uuid.UUID
+	ID                uuid.UUID
+	InteractionLogID  uuid.UUID
 	RetrievedContexts []RetrievedContext
-	SystemPrompt     string
-	RawAgentThoughts string
-	ToolsCalled      []ToolCall
-	CreatedAt        time.Time
+	SystemPrompt      string
+	RawAgentThoughts  string
+	ToolsCalled       []ToolCall
+	// HITL suspension fields (zero-value = 'none', no suspension)
+	WorkflowID  string
+	HITLStatus  HITLStatus
+	SuspendedAt *time.Time
+	ExpiresAt   *time.Time
+	CreatedAt   time.Time
 }

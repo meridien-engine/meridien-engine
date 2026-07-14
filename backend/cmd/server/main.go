@@ -17,9 +17,15 @@ import (
 	"github.com/meridien-engine/meridien-engine/internal/db"
 	"github.com/meridien-engine/meridien-engine/internal/erp"
 	"github.com/meridien-engine/meridien-engine/internal/health"
+	"github.com/meridien-engine/meridien-engine/internal/mera"
+	"github.com/meridien-engine/meridien-engine/internal/mera/agent"
+	"github.com/meridien-engine/meridien-engine/internal/mera/hitl"
+	"github.com/meridien-engine/meridien-engine/internal/mera/middleware"
 	"github.com/meridien-engine/meridien-engine/internal/metrics"
 	"github.com/meridien-engine/meridien-engine/internal/repository"
 	"github.com/meridien-engine/meridien-engine/internal/synapse"
+	"google.golang.org/adk/v2/model"
+	"google.golang.org/adk/v2/model/gemini"
 )
 
 // version is injected at build time via:
@@ -37,6 +43,23 @@ func main() {
 
 	// ── 2. Configuration from environment ────────────────────────────────────
 	cfg := loadConfig()
+
+	// ── 3. OpenTelemetry tracer ───────────────────────────────────────────────
+	// InitTracer connects to the OTEL Collector and registers the global tracer.
+	// All Mera workflow node spans flow through this provider.
+	tracerCtx := context.Background()
+	shutdownTracer, err := agent.InitTracer(tracerCtx, cfg.OTLPEndpoint)
+	if err != nil {
+		// Non-fatal: log and continue — tracing is observability, not correctness.
+		slog.Warn("otel tracer init failed, spans will be dropped", "error", err)
+	} else {
+		defer func() {
+			if err := shutdownTracer(tracerCtx); err != nil {
+				slog.Error("otel tracer shutdown error", "error", err)
+			}
+		}()
+		slog.Info("otel tracer initialised", "endpoint", cfg.OTLPEndpoint)
+	}
 
 	// ── 3. PostgreSQL connection pool ─────────────────────────────────────────
 	database, err := sql.Open("postgres", cfg.DatabaseURL)
@@ -89,6 +112,14 @@ func main() {
 	// ── 7. Health checker ─────────────────────────────────────────────────────
 	healthChecker := health.New(database, version)
 
+	// ── 8. HITL background expiry checker ─────────────────────────────────────
+	// Polls interaction_traces for suspended workflows past their TTL and
+	// auto-rejects them. Runs until the main context is cancelled on shutdown.
+	hitlChecker := hitl.New(interactRepo, 5*time.Minute)
+	bgCtx, bgCancel := context.WithCancel(context.Background())
+	defer bgCancel()
+	go hitlChecker.Run(bgCtx)
+
 	// ── 8. HTTP router ────────────────────────────────────────────────────────
 	r := chi.NewRouter()
 
@@ -106,6 +137,33 @@ func main() {
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		fmt.Fprintf(w, `{"service":"meridien-engine","version":"%s","endpoints":["/healthz","/readyz","/metrics"]}`, version)
+	})
+
+	// Initialize the Gemini model (or MockLLM as fallback in offline dev/testing)
+	var llmModel model.LLM
+	apiKey := os.Getenv("GEMINI_API_KEY")
+	if apiKey == "" {
+		slog.Warn("GEMINI_API_KEY environment variable is not set. Using MockLLM for local development.")
+		llmModel = &agent.MockLLM{}
+	} else {
+		var modelErr error
+		llmModel, modelErr = gemini.NewModel(context.Background(), "gemini-2.5-flash", nil)
+		if modelErr != nil {
+			slog.Error("failed to initialize gemini model", "error", modelErr)
+			os.Exit(1)
+		}
+		slog.Info("gemini model initialized successfully", "model", "gemini-2.5-flash")
+	}
+
+	// ── Mera gateway route group ──────────────────────────────────────────────
+	meraHandler, err := mera.NewHandler(llmModel, synapseSvc, erpSvc, productRepo, knowledgeRepo)
+	if err != nil {
+		slog.Error("failed to create mera handler", "error", err)
+		os.Exit(1)
+	}
+	r.Route("/api/v1/mera", func(r chi.Router) {
+		r.Use(middleware.JWTAuth)
+		r.Post("/webhook", meraHandler.Webhook)
 	})
 
 	// ── TODO: REST API routes for ERP portal, Compass dashboard ──────────────
@@ -139,6 +197,8 @@ func main() {
 
 	<-quit
 	slog.Info("shutdown signal received")
+	bgCancel() // stop background tasks (including HITL checker)
+
 
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer shutdownCancel()
@@ -152,14 +212,16 @@ func main() {
 // ─── Configuration ────────────────────────────────────────────────────────────
 
 type config struct {
-	Port        string
-	DatabaseURL string
+	Port         string
+	DatabaseURL  string
+	OTLPEndpoint string
 }
 
 func loadConfig() config {
 	return config{
-		Port:        getEnv("PORT", "8080"),
-		DatabaseURL: mustEnv("DATABASE_URL"),
+		Port:         getEnv("PORT", "8080"),
+		DatabaseURL:  mustEnv("DATABASE_URL"),
+		OTLPEndpoint: getEnv("OTLP_ENDPOINT", "localhost:4317"),
 	}
 }
 

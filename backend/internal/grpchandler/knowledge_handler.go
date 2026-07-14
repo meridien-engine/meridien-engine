@@ -3,12 +3,15 @@ package grpchandler
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
 	"github.com/meridien-engine/meridien-engine/internal/domain"
 	"github.com/meridien-engine/meridien-engine/internal/gen/knowledge"
 	"github.com/meridien-engine/meridien-engine/internal/metrics"
+	"google.golang.org/adk/v2/model"
+	"google.golang.org/genai"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -18,14 +21,15 @@ type KnowledgeHandler struct {
 	knowledge.UnimplementedKnowledgeServiceServer
 	repo      domain.KnowledgeRepository
 	embedFunc EmbedFunc
+	llmModel  model.LLM
 }
 
 // EmbedFunc converts a text string into a float32 embedding vector.
 // The implementation calls the configured embedding API (e.g. OpenAI).
 type EmbedFunc func(ctx context.Context, text string) ([]float32, error)
 
-func NewKnowledgeHandler(repo domain.KnowledgeRepository, embed EmbedFunc) *KnowledgeHandler {
-	return &KnowledgeHandler{repo: repo, embedFunc: embed}
+func NewKnowledgeHandler(repo domain.KnowledgeRepository, embed EmbedFunc, llmModel model.LLM) *KnowledgeHandler {
+	return &KnowledgeHandler{repo: repo, embedFunc: embed, llmModel: llmModel}
 }
 
 // QueryKnowledge performs a vector similarity search for Mera's RAG step.
@@ -78,10 +82,14 @@ func (h *KnowledgeHandler) IngestDocument(ctx context.Context, req *knowledge.In
 		return nil, status.Error(codes.InvalidArgument, "source_name and content are required")
 	}
 
-	// Naive chunking: split into ~512-character windows with 64-char overlap.
-	chunks := chunkText(req.Content, 512, 64)
-	created := 0
+	// Semantic LLM-Based Chunking using h.llmModel
+	chunks, err := h.semanticChunkText(ctx, req.Content)
+	if err != nil {
+		// Fallback to naive character-based chunking if LLM chunking fails
+		chunks = chunkText(req.Content, 512, 64)
+	}
 
+	created := 0
 	for _, chunk := range chunks {
 		embedding, err := h.embedFunc(ctx, chunk)
 		if err != nil {
@@ -94,6 +102,57 @@ func (h *KnowledgeHandler) IngestDocument(ctx context.Context, req *knowledge.In
 	}
 
 	return &knowledge.IngestResponse{ChunksCreated: int32(created), Success: true}, nil
+}
+
+// semanticChunkText segments raw text into semantic chunks using the configured LLM.
+func (h *KnowledgeHandler) semanticChunkText(ctx context.Context, text string) ([]string, error) {
+	if h.llmModel == nil {
+		return nil, fmt.Errorf("LLM model not configured for semantic chunking")
+	}
+
+	prompt := fmt.Sprintf(`You are a precise document segmentation agent. Your task is to split the input text into semantically coherent chunks based on meaning, topic, and paragraph boundaries. This system supports English, Arabic, and code-switched technical files. You MUST NOT summarize, change, translate, or delete any characters from the original text. Output strictly a JSON array of strings containing the chunks in order.
+
+Segment the following text into logical chunks:
+
+[TEXT START]
+%s
+[TEXT END]`, text)
+
+	req := &model.LLMRequest{
+		Model: h.llmModel.Name(),
+		Contents: []*genai.Content{
+			{
+				Role: "user",
+				Parts: []*genai.Part{
+					genai.NewPartFromText(prompt),
+				},
+			},
+		},
+		Config: &genai.GenerateContentConfig{
+			ResponseMIMEType: "application/json",
+		},
+	}
+
+	var replyJSON string
+	for resp, err := range h.llmModel.GenerateContent(ctx, req, false) {
+		if err != nil {
+			return nil, err
+		}
+		if resp.Content != nil && len(resp.Content.Parts) > 0 {
+			replyJSON += resp.Content.Parts[0].Text
+		}
+	}
+
+	var chunks []string
+	if err := json.Unmarshal([]byte(replyJSON), &chunks); err != nil {
+		return nil, err
+	}
+
+	if len(chunks) == 0 {
+		return nil, fmt.Errorf("LLM returned empty chunks")
+	}
+
+	return chunks, nil
 }
 
 // ─── chunking helper ──────────────────────────────────────────────────────────
@@ -114,4 +173,3 @@ func chunkText(text string, size, overlap int) []string {
 	}
 	return chunks
 }
-
