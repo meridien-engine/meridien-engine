@@ -171,3 +171,9 @@ Meridien Engine utilizes a **two-token JWT authentication flow** to isolate glob
 5. API Handlers           → Accept ONLY scoped JWT
 ```
 *   **gRPC Handlers**: Use a server unary interceptor (`TenantInterceptor`) extracting metadata credentials and injecting them into the context via `repository.WithBusinessID`.
+
+---
+
+## 7. Supplemental Material
+For engineering dependencies, mathematical formulas, and external research repositories, see [docs/REFERENCES.md](file:///media/muhammad/FS/2026/meridien-engine/docs/REFERENCES.md).
+
