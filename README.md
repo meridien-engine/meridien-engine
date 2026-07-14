@@ -18,8 +18,8 @@ Meridien Engine is a **Modular Monolith in Go** with four internal service bound
 |---|---|---|
 | **ERP Core** | Product catalog, orders, stock management, tenant isolation | `internal/erp` |
 | **Synapse** | Unified Customer Model (UCM), identity resolution across channels | `internal/synapse` |
-| **Knowledge** | pgvector RAG — semantic search over merchant-uploaded documents | `internal/repository` (knowledge) |
-| **Mera Brain** | AI agent ReAct loop, tool dispatch, full trace recording | `internal/brain` |
+| **Knowledge** | pgvector RAG — supports LLM-based semantic chunking and search | `internal/grpchandler` |
+| **Mera Agent** | ADK v2 directed graph agent, HITL timeout checker daemon | `internal/mera` |
 
 ### System Topology Overview
 
@@ -114,9 +114,9 @@ meridien-engine/
 | **Backend** | Go 1.22, Chi router, sqlc, gRPC |
 | **Database** | PostgreSQL 16 + pgvector, Row-Level Security |
 | **Cache** | Redis 7 |
-| **Observability** | Prometheus, Grafana, structured JSON logging (slog) |
+| **Observability** | Prometheus, Grafana, OpenTelemetry, Tempo, structured JSON logging (slog) |
 | **Containerisation** | Docker, Docker Compose |
-| **LLM** | Provider-agnostic (Claude, Gemini, etc. via `LLMClient` interface) |
+| **LLM / Agent** | Google ADK v2, Google Gemini generative models |
 
 ---
 
