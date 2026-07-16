@@ -88,7 +88,9 @@ func (d *DynamicLLM) resolveLLM(ctx context.Context) model.LLM {
 	}
 
 	customKey, err := d.secretsRepo.GetSecret(ctx, bizID, domain.SecretKeyGeminiAPI)
-	if err == nil && customKey != "" {
+	if err != nil {
+		slog.Warn("DynamicLLM: failed to fetch custom key, using fallback", "business_id", bizIDStr, "error", err)
+	} else if customKey != "" {
 		// We found a custom key! Instantiate a dedicated client for this tenant.
 		customClient, err := gemini.NewModel(ctx, d.modelName, &genai.ClientConfig{
 			APIKey: customKey,
@@ -107,5 +109,26 @@ func (d *DynamicLLM) resolveLLM(ctx context.Context) model.LLM {
 	return d.fallbackLLM
 }
 
+// EmbedContent generates a 768-dimensional embedding for the given text using the business's API key.
+// It returns a slice of zeros if it fails, to gracefully degrade.
+func (d *DynamicLLM) EmbedContent(ctx context.Context, text string) []float32 {
+	bizIDStr, err := repository.BusinessIDFromContext(ctx)
+	if err == nil {
+		bizID, _ := uuid.Parse(bizIDStr)
+		customKey, err := d.secretsRepo.GetSecret(ctx, bizID, domain.SecretKeyGeminiAPI)
+		if err == nil && customKey != "" {
+			client, err := genai.NewClient(ctx, &genai.ClientConfig{APIKey: customKey})
+			if err == nil {
+				res, err := client.Models.EmbedContent(ctx, "text-embedding-004", genai.Text(text), nil)
+				if err == nil && len(res.Embeddings) > 0 {
+					return res.Embeddings[0].Values
+				}
+			}
+		}
+	}
+	// Fallback to dummy vector if embedding fails (768 dims)
+	return make([]float32, 768)
+}
+
 // Ensure DynamicLLM implements model.LLM
-var _ model.LLM = &DynamicLLM{}
+var _ model.LLM = (*DynamicLLM)(nil)

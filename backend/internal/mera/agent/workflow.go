@@ -46,13 +46,6 @@ type LLMRouterResponse struct {
 }
 
 // mockEmbedding generates a dummy 1536-dimensional embedding slice for local development.
-func mockEmbedding(text string) []float32 {
-	emb := make([]float32, 1536)
-	for i := 0; i < len(text) && i < 1536; i++ {
-		emb[i] = float32(text[i]) / 255.0
-	}
-	return emb
-}
 
 // NewMeraWorkflow constructs and wires the ADK workflow graph for Mera reasoning loops.
 func NewMeraWorkflow(
@@ -98,7 +91,14 @@ func NewMeraWorkflow(
 	// ── Node 2: RAG Vector Retrieval ──────────────────────────────────────────
 	ragRetrievalNode := workflow.NewFunctionNode("rag_retrieval",
 		func(ctx agent.Context, in CustomerResolutionOutput) (RAGRetrievalOutput, error) {
-			emb := mockEmbedding(in.Message)
+			var emb []float32
+			if dynLLM, ok := llmModel.(*DynamicLLM); ok {
+				emb = dynLLM.EmbedContent(ctx, in.Message)
+			} else {
+				// Fallback to zeros if not DynamicLLM
+				emb = make([]float32, 768)
+			}
+			
 			chunks, err := knowledgeRepo.Query(ctx, emb, 3)
 			if err != nil {
 				return RAGRetrievalOutput{
