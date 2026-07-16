@@ -12,6 +12,7 @@ import (
 	"github.com/meridien-engine/meridien-engine/internal/repository"
 	"google.golang.org/adk/v2/model"
 	"google.golang.org/adk/v2/model/gemini"
+	"google.golang.org/genai"
 )
 
 // DynamicLLM is a model.LLM implementation that routes generation requests
@@ -88,19 +89,18 @@ func (d *DynamicLLM) resolveLLM(ctx context.Context) model.LLM {
 
 	customKey, err := d.secretsRepo.GetSecret(ctx, bizID, domain.SecretKeyGeminiAPI)
 	if err == nil && customKey != "" {
-		// We found a custom key! Let's instantiate a dedicated client for this tenant.
-		// genai SDK uses the GEMINI_API_KEY env var by default, but we can pass it via context
-		// wait, the gemini package in ADK v2 doesn't let us pass the key dynamically 
-		// via NewModel config easily without setting env vars, but we can configure the client 
-		// if we had direct access. For now, since ADK gemini wrapper doesn't expose the underlying
-		// genai client options directly, we will rely on the global fallback. 
+		// We found a custom key! Instantiate a dedicated client for this tenant.
+		customClient, err := gemini.NewModel(ctx, d.modelName, &genai.ClientConfig{
+			APIKey: customKey,
+		})
 		
-		// TODO: Once ADK supports passing API keys explicitly in NewModel config, update this block:
-		// customClient, err := gemini.NewModel(ctx, d.modelName, &gemini.ModelConfig{APIKey: customKey})
-		// d.clients.Store(bizIDStr, customClient)
-		// return customClient
+		if err == nil {
+			slog.Debug("DynamicLLM: instantiated custom Gemini client for tenant", "business_id", bizIDStr)
+			d.clients.Store(bizIDStr, customClient)
+			return customClient
+		}
 		
-		slog.Debug("DynamicLLM: found custom key for tenant, but waiting on ADK support. Using fallback.", "business_id", bizIDStr)
+		slog.Error("DynamicLLM: failed to instantiate custom Gemini client, falling back", "business_id", bizIDStr, "error", err)
 	}
 
 	// 3. Fallback
