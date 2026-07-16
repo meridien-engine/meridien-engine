@@ -23,7 +23,7 @@ CREATE TABLE system_secrets (
 ALTER TABLE system_secrets ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY system_secrets_tenant_isolation ON system_secrets
-  USING (business_id = current_setting('app.current_business_id')::uuid);
+  USING (business_id = current_setting('app.current_business', true)::uuid);
 
 CREATE TRIGGER system_secrets_updated_at
   BEFORE UPDATE ON system_secrets
