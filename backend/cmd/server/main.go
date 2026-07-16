@@ -128,15 +128,24 @@ func main() {
 		return metrics.Middleware(next)
 	})
 
-	// ── Health & observability endpoints ──────────────────────────────────────
+		// ── Health & observability endpoints ──────────────────────────────────────
 	r.Get("/healthz", healthChecker.Liveness)
 	r.Get("/readyz", healthChecker.Readiness)
 	r.Handle("/metrics", metrics.Handler())
 
+	// Serve the WhatsApp Mock Testing Utility page under /debug/whatsapp
+	r.Get("/debug/whatsapp", func(w http.ResponseWriter, r *http.Request) {
+		if _, err := os.Stat("backend/test/mock_whatsapp.html"); err == nil {
+			http.ServeFile(w, r, "backend/test/mock_whatsapp.html")
+			return
+		}
+		http.ServeFile(w, r, "test/mock_whatsapp.html")
+	})
+
 	// ── Debug / info endpoint ────────────────────────────────────────────────
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprintf(w, `{"service":"meridien-engine","version":"%s","endpoints":["/healthz","/readyz","/metrics"]}`, version)
+		fmt.Fprintf(w, `{"service":"meridien-engine","version":"%s","endpoints":["/healthz","/readyz","/metrics","/debug/whatsapp"]}`, version)
 	})
 
 	// Initialize the Gemini model (or MockLLM as fallback in offline dev/testing)

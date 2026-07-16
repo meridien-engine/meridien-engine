@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WhatsApp Webhook Mock Testing Utility — Meridien Engine</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --wa-green: #075E54;
+      --wa-light-green: #25D366;
+      --wa-chat-bg: #efeae2;
+      --wa-incoming-bg: #ffffff;
+      --wa-outgoing-bg: #d9fdd3;
+      --wa-header-bg: #f0f2f5;
+      
+      --dark-bg: #0b141a;
+      --dark-panel: #111b21;
+      --dark-chat-bg: #0b141a;
+      --dark-incoming: #202c33;
+      --dark-outgoing: #005c4b;
+      --dark-header: #202c33;
+      --dark-border: #222e35;
+      --dark-text: #e9edef;
+      --dark-text-muted: #8696a0;
+
+      --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+      --font-mono: 'Fira Code', monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      background-color: #1f2c34;
+      color: var(--dark-text);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── Header Bar ────────────────────────────────────────── */
+    header.app-header {
+      background-color: var(--dark-panel);
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--dark-border);
+    }
+
+    .logo-container {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo-badge {
+      background-color: var(--wa-light-green);
+      color: #000000;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      font-weight: 700;
+    }
+
+    .title-area h1 {
+      font-size: 1.15rem;
+      font-weight: 600;
+    }
+
+    .title-area p {
+      font-size: 0.75rem;
+      color: var(--dark-text-muted);
+    }
+
+    /* ── Main Work Area ────────────────────────────────────── */
+    .workspace {
+      display: flex;
+      flex: 1;
+      height: calc(100vh - 65px);
+      overflow: hidden;
+    }
+
+    /* ── Left Control Panel ────────────────────────────────── */
+    .control-panel {
+      width: 320px;
+      background-color: var(--dark-panel);
+      border-right: 1px solid var(--dark-border);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      overflow-y: auto;
+    }
+
+    .section-title {
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--wa-light-green);
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    label {
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: var(--dark-text-muted);
+    }
+
+    input, select {
+      background-color: #202c33;
+      border: 1px solid var(--dark-border);
+      border-radius: 6px;
+      padding: 10px 12px;
+      color: var(--dark-text);
+      font-family: var(--font-sans);
+      font-size: 0.85rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    input:focus, select:focus {
+      border-color: var(--wa-light-green);
+    }
+
+    .btn {
+      background-color: var(--wa-light-green);
+      color: #0b141a;
+      border: none;
+      padding: 12px;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 0.85rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: background-color 0.2s;
+    }
+
+    .btn:hover {
+      background-color: #20c65c;
+    }
+
+    .btn-secondary {
+      background-color: #202c33;
+      color: var(--dark-text);
+      border: 1px solid var(--dark-border);
+    }
+
+    .btn-secondary:hover {
+      background-color: #2a3942;
+    }
+
+    /* ── Chat Container ────────────────────────────────────── */
+    .chat-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background-color: var(--dark-chat-bg);
+      position: relative;
+    }
+
+    /* Simulated Chat Wallpaper pattern overlay */
+    .chat-container::before {
+      content: "";
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-image: url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png');
+      opacity: 0.04;
+      pointer-events: none;
+    }
+
+    .chat-header {
+      background-color: var(--dark-header);
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border-bottom: 1px solid var(--dark-border);
+      position: relative;
+      z-index: 2;
+    }
+
+    .chat-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background-color: var(--wa-green);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2rem;
+    }
+
+    .chat-title-info {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .chat-title-info h2 {
+      font-size: 0.95rem;
+      font-weight: 500;
+    }
+
+    .chat-title-info span {
+      font-size: 0.75rem;
+      color: var(--wa-light-green);
+    }
+
+    .chat-messages {
+      flex: 1;
+      padding: 24px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      position: relative;
+      z-index: 2;
+    }
+
+    /* ── Message Bubbles ───────────────────────────────────── */
+    .message-bubble {
+      max-width: 65%;
+      padding: 8px 12px 10px;
+      border-radius: 8px;
+      position: relative;
+      font-size: 0.9rem;
+      line-height: 1.4;
+      word-wrap: break-word;
+      animation: popIn 0.2s ease-out;
+    }
+
+    @keyframes popIn {
+      from { transform: scale(0.95); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+
+    .message-bubble.incoming {
+      background-color: var(--dark-incoming);
+      color: var(--dark-text);
+      align-self: flex-start;
+      border-top-left-radius: 0;
+    }
+
+    .message-bubble.outgoing {
+      background-color: var(--dark-outgoing);
+      color: var(--dark-text);
+      align-self: flex-end;
+      border-top-right-radius: 0;
+    }
+
+    .message-time {
+      display: block;
+      font-size: 0.7rem;
+      color: var(--dark-text-muted);
+      text-align: right;
+      margin-top: 4px;
+    }
+
+    .message-bubble.system-alert {
+      background-color: #513c06;
+      color: #ffd666;
+      align-self: center;
+      max-width: 80%;
+      border-radius: 6px;
+      padding: 6px 12px;
+      font-size: 0.8rem;
+      text-align: center;
+      border: 1px solid #876508;
+    }
+
+    /* ── Chat Input Bar ────────────────────────────────────── */
+    .chat-input-bar {
+      background-color: var(--dark-header);
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border-top: 1px solid var(--dark-border);
+      position: relative;
+      z-index: 2;
+    }
+
+    .chat-input-bar input {
+      flex: 1;
+      border-radius: 8px;
+      padding: 12px;
+      border: none;
+      background-color: #2a3942;
+    }
+
+    .chat-input-bar input:focus {
+      border: none;
+    }
+
+    /* ── Logger Console (Collapsible Bottom Panel) ────────── */
+    .logger-panel {
+      width: 400px;
+      background-color: var(--dark-panel);
+      border-left: 1px solid var(--dark-border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .logger-header {
+      padding: 12px 16px;
+      background-color: var(--dark-header);
+      border-bottom: 1px solid var(--dark-border);
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--dark-text);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .logger-body {
+      flex: 1;
+      padding: 16px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+    }
+
+    .log-block {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .log-label {
+      color: var(--wa-light-green);
+      font-weight: 600;
+    }
+
+    .log-content {
+      background-color: #0b141a;
+      border: 1px solid var(--dark-border);
+      border-radius: 6px;
+      padding: 10px;
+      white-space: pre-wrap;
+      overflow-x: auto;
+      max-height: 250px;
+    }
+
+    .log-status {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: 700;
+    }
+
+    .log-status.success { background-color: #0e3020; color: #5cdb95; }
+    .log-status.error { background-color: #3b1313; color: #ff5c5c; }
+  </style>
+</head>
+<body>
+
+  <!-- ── APP HEADER ── -->
+  <header class="app-header">
+    <div class="logo-container">
+      <div class="logo-badge">WA MOCK</div>
+      <div class="title-area">
+        <h1>Meridien Webhook Testing Console</h1>
+        <p>Simulate Meta WhatsApp / Messenger incoming requests locally</p>
+      </div>
+    </div>
+  </header>
+
+  <!-- ── WORKSPACE ── -->
+  <div class="workspace">
+
+    <!-- ── LEFT CONTROL PANEL ── -->
+    <div class="control-panel">
+      
+      <div class="control-section">
+        <h3 class="section-title">Gateway Configuration</h3>
+        
+        <div class="form-group" style="margin-bottom: 12px;">
+          <label for="webhook-url">Local Webhook URL</label>
+          <input type="text" id="webhook-url" value="http://localhost:8080/api/v1/mera/webhook">
+        </div>
+
+        <div class="form-group" style="margin-bottom: 12px;">
+          <label for="jwt-token">Scoped Auth JWT (Bearer)</label>
+          <input type="text" id="jwt-token" placeholder="Paste signed JWT token here...">
+        </div>
+      </div>
+
+      <div class="control-section">
+        <h3 class="section-title">WhatsApp Payload Setup</h3>
+        
+        <div class="form-group" style="margin-bottom: 12px;">
+          <label for="sender-phone">Simulated Sender Number</label>
+          <input type="text" id="sender-phone" value="+16505551234">
+        </div>
+
+        <div class="form-group" style="margin-bottom: 12px;">
+          <label for="expected-price">Expected Price Override (Optional)</label>
+          <input type="number" id="expected-price" step="0.01" placeholder="e.g. 49.99">
+        </div>
+        
+        <div class="form-group" style="margin-bottom: 12px;">
+          <label for="payload-format">Simulated Event format</label>
+          <select id="payload-format">
+            <option value="raw_whatsapp">Raw Meta WhatsApp Business API</option>
+            <option value="raw_messenger">Raw Meta Messenger Envelope</option>
+            <option value="flat_developer">Flat Developer JSON (Internal)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="control-section" style="margin-top: auto;">
+        <button class="btn btn-secondary" onclick="clearChat()" style="width: 100%; margin-bottom: 10px;">
+          🧹 Clear Chat Window
+        </button>
+      </div>
+
+    </div>
+
+    <!-- ── CHAT CONTAINER ── -->
+    <div class="chat-container">
+      
+      <!-- Chat Header -->
+      <div class="chat-header">
+        <div class="chat-avatar">🤖</div>
+        <div class="chat-title-info">
+          <h2>Mera AI Agent</h2>
+          <span>Online — Ready to receive hook</span>
+        </div>
+      </div>
+
+      <!-- Message History -->
+      <div class="chat-messages" id="chat-box">
+        <div class="message-bubble incoming">
+          Hello! I am Mera, your AI agent representative. Send me a message to place an order or ask a question.
+          <span class="message-time">System</span>
+        </div>
+      </div>
+
+      <!-- Bottom Chat Input -->
+      <div class="chat-input-bar">
+        <input type="text" id="message-input" placeholder="Type a message (e.g. I want to buy 2 units of WIDGET-01)..." onkeydown="handleKeyPress(event)">
+        <button class="btn" onclick="sendSimulatedMessage()">Send ➜</button>
+      </div>
+
+    </div>
+
+    <!-- ── LOGGER PANEL (RIGHT SIDEBAR) ── -->
+    <div class="logger-panel">
+      <div class="logger-header">
+        <span>Raw Payload Observability Console</span>
+        <span id="http-status-badge" class="log-status" style="display:none;">200 OK</span>
+      </div>
+      <div class="logger-body">
+        
+        <div class="log-block">
+          <span class="log-label">POST Headers</span>
+          <pre id="log-headers" class="log-content">Waiting for request...</pre>
+        </div>
+
+        <div class="log-block">
+          <span class="log-label">Request Payload Sent</span>
+          <pre id="log-request" class="log-content">Waiting for request...</pre>
+        </div>
+
+        <div class="log-block">
+          <span class="log-label">Response JSON Received</span>
+          <pre id="log-response" class="log-content">Waiting for response...</pre>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    function handleKeyPress(event) {
+      if (event.key === 'Enter') {
+        sendSimulatedMessage();
+      }
+    }
+
+    function clearChat() {
+      const chatBox = document.getElementById('chat-box');
+      chatBox.innerHTML = `
+        <div class="message-bubble incoming">
+          Hello! I am Mera, your AI agent representative. Send me a message to place an order or ask a question.
+          <span class="message-time">System</span>
+        </div>
+      `;
+    }
+
+    async function sendSimulatedMessage() {
+      const msgInput = document.getElementById('message-input');
+      const messageText = msgInput.value.trim();
+      if (!messageText) return;
+
+      // Add customer bubble (outgoing)
+      appendMessage(messageText, 'outgoing');
+      msgInput.value = '';
+
+      const webhookUrl = document.getElementById('webhook-url').value;
+      const token = document.getElementById('jwt-token').value;
+      const senderPhone = document.getElementById('sender-phone').value;
+      const expectedPriceVal = document.getElementById('expected-price').value;
+      const format = document.getElementById('payload-format').value;
+
+      // Build payload based on selection
+      let payload = {};
+      if (format === 'flat_developer') {
+        payload = {
+          channel: "whatsapp",
+          channel_external_id: senderPhone,
+          message: messageText
+        };
+        if (expectedPriceVal) {
+          payload.expected_price = parseFloat(expectedPriceVal);
+        }
+      } else if (format === 'raw_messenger') {
+        payload = {
+          object: "page",
+          entry: [{
+            id: "page-123",
+            messaging: [{
+              sender: { id: senderPhone },
+              recipient: { id: "page-123" },
+              timestamp: Date.now(),
+              message: {
+                mid: "mid." + Math.random().toString(36).substring(7),
+                text: messageText
+              }
+            }]
+          }]
+        };
+      } else {
+        // raw_whatsapp
+        payload = {
+          object: "whatsapp_business_account",
+          entry: [{
+            id: "wa-business-123",
+            changes: [{
+              field: "messages",
+              value: {
+                messaging_product: "whatsapp",
+                metadata: {
+                  display_phone_number: "+16505551111",
+                  phone_number_id: "phone-123"
+                },
+                contacts: [{
+                  profile: { name: "Simulated Customer" },
+                  wa_id: senderPhone.replace('+', '')
+                }],
+                messages: [{
+                  from: senderPhone,
+                  id: "msg-" + Math.random().toString(36).substring(7),
+                  timestamp: Math.floor(Date.now() / 1000).toString(),
+                  type: "text",
+                  text: { body: messageText }
+                }]
+              }
+            }]
+          }]
+        };
+      }
+
+      // Log request details
+      const headers = {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+      };
+
+      document.getElementById('log-headers').textContent = JSON.stringify(headers, null, 2);
+      document.getElementById('log-request').textContent = JSON.stringify(payload, null, 2);
+
+      const statusBadge = document.getElementById('http-status-badge');
+      statusBadge.style.display = 'inline-block';
+      statusBadge.textContent = 'PENDING...';
+      statusBadge.className = 'log-status';
+
+      try {
+        const response = await fetch(webhookUrl, {
+          method: 'POST',
+          headers: headers,
+          body: JSON.stringify(payload)
+        });
+
+        const statusText = `${response.status} ${response.statusText}`;
+        statusBadge.textContent = statusText;
+        if (response.ok) {
+          statusBadge.className = 'log-status success';
+        } else {
+          statusBadge.className = 'log-status error';
+        }
+
+        const resBodyText = await response.text();
+        let displayJson = resBodyText;
+        try {
+          const parsed = JSON.parse(resBodyText);
+          displayJson = JSON.stringify(parsed, null, 2);
+
+          // If webhook resolved successfully, display AI reply bubble (incoming)
+          if (response.ok && parsed.reply) {
+            appendMessage(parsed.reply, 'incoming');
+            
+            // Check if response shows suspended HITL workflow
+            if (parsed.reply.includes("review") || parsed.reply.includes("mismatch")) {
+              appendSystemAlert("⚠️ Escalation Triggered: Turn suspended for Merchant approval.");
+            }
+          }
+        } catch (e) {
+          // Response is not JSON (e.g. plain text or html error)
+        }
+
+        document.getElementById('log-response').textContent = displayJson;
+
+      } catch (err) {
+        statusBadge.textContent = 'FAILED TO FETCH';
+        statusBadge.className = 'log-status error';
+        document.getElementById('log-response').textContent = err.toString();
+        appendMessage("Error: Could not connect to the local Go server. Verify the server is running on port 8080 and CORS is enabled.", 'incoming');
+      }
+    }
+
+    function appendMessage(text, direction) {
+      const chatBox = document.getElementById('chat-box');
+      const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      
+      const bubble = document.createElement('div');
+      bubble.className = `message-bubble ${direction}`;
+      bubble.innerHTML = `
+        ${text}
+        <span class="message-time">${timeStr}</span>
+      `;
+      
+      chatBox.appendChild(bubble);
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    function appendSystemAlert(text) {
+      const chatBox = document.getElementById('chat-box');
+      const alert = document.createElement('div');
+      alert.className = 'message-bubble system-alert';
+      alert.textContent = text;
+      chatBox.appendChild(alert);
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
+  </script>
+</body>
+</html>

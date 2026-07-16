@@ -36,3 +36,9 @@ Thumbs.db
 # Archived documents
 docs/archive/
 
+# Private planning docs (local only — do not push)
+docs/deployment_plan.md
+docs/frontend_bootstrap_plan.md
+docs/frontend_implementation_plan.md
+docs/meridien_portal_design_brief.md
+
