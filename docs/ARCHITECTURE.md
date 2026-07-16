@@ -176,5 +176,6 @@ Meridien Engine utilizes a **two-token JWT authentication flow** to isolate glob
 
 ## 7. Supplemental Material
 *   For request payloads, response signatures, and gRPC service message contracts, see [docs/API.md](file:///media/muhammad/FS/2026/meridien-engine/docs/API.md).
+*   For frontend monorepo workspace setups, directories, and the platform admin control plane, see [docs/frontend_bootstrap_plan.md](file:///media/muhammad/FS/2026/meridien-engine/docs/frontend_bootstrap_plan.md).
 *   For engineering dependencies, mathematical formulas, and external research repositories, see [docs/REFERENCES.md](file:///media/muhammad/FS/2026/meridien-engine/docs/REFERENCES.md).
 

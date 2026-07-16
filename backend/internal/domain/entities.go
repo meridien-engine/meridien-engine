@@ -168,3 +168,25 @@ type InteractionTrace struct {
 	ExpiresAt   *time.Time
 	CreatedAt   time.Time
 }
+
+// ─── System Secrets ───────────────────────────────────────────────────────────
+// Encrypted key-value pairs stored per-business in the database.
+// The application layer encrypts/decrypts using AES-256-GCM before storage.
+
+// Well-known secret key names
+const (
+	SecretKeyGeminiAPI          = "gemini_api_key"
+	SecretKeyMetaPageToken      = "meta_page_access_token"
+	SecretKeyMetaWebhookVerify  = "meta_webhook_verify_token"
+	SecretKeyMetaAppSecret      = "meta_app_secret"
+)
+
+type SystemSecret struct {
+	ID          uuid.UUID
+	BusinessID  uuid.UUID
+	KeyName     string
+	EncryptedVal string // AES-256-GCM encrypted, base64-encoded
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+}
+

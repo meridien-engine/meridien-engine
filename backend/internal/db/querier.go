@@ -29,6 +29,7 @@ type Querier interface {
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	// Atomically decrements stock. Returns error (no rows) if insufficient stock.
 	DecrementStock(ctx context.Context, arg DecrementStockParams) (Product, error)
+	DeleteSecret(ctx context.Context, arg DeleteSecretParams) error
 	ExpireInvitation(ctx context.Context, id uuid.UUID) error
 	GetBusinessByID(ctx context.Context, id uuid.UUID) (Business, error)
 	GetBusinessBySlug(ctx context.Context, slug string) (Business, error)
@@ -46,6 +47,8 @@ type Querier interface {
 	GetPendingJoinRequest(ctx context.Context, arg GetPendingJoinRequestParams) (JoinRequest, error)
 	GetProductByID(ctx context.Context, id uuid.UUID) (Product, error)
 	GetProductBySKU(ctx context.Context, arg GetProductBySKUParams) (Product, error)
+	// Retrieves a single encrypted secret by business + key name.
+	GetSecret(ctx context.Context, arg GetSecretParams) (SystemSecret, error)
 	// queries/users.sql
 	// sqlc generates type-safe Go from these queries.
 	// Run: sqlc generate (from backend/)
@@ -66,6 +69,8 @@ type Querier interface {
 	ListOrdersByCustomer(ctx context.Context, customerID uuid.UUID) ([]Order, error)
 	ListPendingJoinRequests(ctx context.Context, businessID uuid.UUID) ([]ListPendingJoinRequestsRow, error)
 	ListProducts(ctx context.Context) ([]Product, error)
+	// Lists all key names (NOT values) for a business — for the admin UI.
+	ListSecretKeys(ctx context.Context, businessID uuid.UUID) ([]ListSecretKeysRow, error)
 	ListUserBusinesses(ctx context.Context, userID uuid.UUID) ([]ListUserBusinessesRow, error)
 	ReviewJoinRequest(ctx context.Context, arg ReviewJoinRequestParams) (JoinRequest, error)
 	SoftDeleteProduct(ctx context.Context, id uuid.UUID) error
@@ -82,6 +87,10 @@ type Querier interface {
 	// Resolves or creates the channel mapping, returning the customer profile.
 	// Used by Synapse on every inbound message to identify the customer.
 	UpsertCustomerChannel(ctx context.Context, arg UpsertCustomerChannelParams) (CustomerChannel, error)
+	// queries/secrets.sql
+	// Inserts or updates a secret for a business.
+	// The value must be encrypted BEFORE calling this query.
+	UpsertSecret(ctx context.Context, arg UpsertSecretParams) (SystemSecret, error)
 }
 
 var _ Querier = (*Queries)(nil)

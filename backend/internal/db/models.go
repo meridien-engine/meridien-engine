@@ -161,6 +161,15 @@ type Product struct {
 	DeletedAt   sql.NullTime    `json:"deleted_at"`
 }
 
+type SystemSecret struct {
+	ID           uuid.UUID `json:"id"`
+	BusinessID   uuid.UUID `json:"business_id"`
+	KeyName      string    `json:"key_name"`
+	EncryptedVal string    `json:"encrypted_val"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+}
+
 type User struct {
 	ID           uuid.UUID      `json:"id"`
 	Email        string         `json:"email"`
