@@ -67,7 +67,10 @@ func main() {
 		chunk = strings.TrimSpace(chunk)
 		if chunk == "" { continue }
 
-		res, err := client.Models.EmbedContent(ctx, "text-embedding-004", genai.Text(chunk), nil)
+		dim := int32(768)
+		res, err := client.Models.EmbedContent(ctx, "gemini-embedding-2", genai.Text(chunk), &genai.EmbedContentConfig{
+			OutputDimensionality: &dim,
+		})
 		if err != nil || len(res.Embeddings) == 0 {
 			log.Fatalf("failed to embed chunk %d: %v", i, err)
 		}

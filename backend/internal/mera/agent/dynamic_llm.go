@@ -119,7 +119,10 @@ func (d *DynamicLLM) EmbedContent(ctx context.Context, text string) []float32 {
 		if err == nil && customKey != "" {
 			client, err := genai.NewClient(ctx, &genai.ClientConfig{APIKey: customKey})
 			if err == nil {
-				res, err := client.Models.EmbedContent(ctx, "text-embedding-004", genai.Text(text), nil)
+				dim := int32(768)
+				res, err := client.Models.EmbedContent(ctx, "gemini-embedding-2", genai.Text(text), &genai.EmbedContentConfig{
+					OutputDimensionality: &dim,
+				})
 				if err == nil && len(res.Embeddings) > 0 {
 					return res.Embeddings[0].Values
 				}
