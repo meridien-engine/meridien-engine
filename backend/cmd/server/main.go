@@ -24,8 +24,7 @@ import (
 	"github.com/meridien-engine/meridien-engine/internal/metrics"
 	"github.com/meridien-engine/meridien-engine/internal/repository"
 	"github.com/meridien-engine/meridien-engine/internal/synapse"
-	"google.golang.org/adk/v2/model"
-	"google.golang.org/adk/v2/model/gemini"
+
 )
 
 // version is injected at build time via:
@@ -148,21 +147,17 @@ func main() {
 		fmt.Fprintf(w, `{"service":"meridien-engine","version":"%s","endpoints":["/healthz","/readyz","/metrics","/debug/whatsapp"]}`, version)
 	})
 
-	// Initialize the Gemini model (or MockLLM as fallback in offline dev/testing)
-	var llmModel model.LLM
-	apiKey := os.Getenv("GEMINI_API_KEY")
-	if apiKey == "" {
-		slog.Warn("GEMINI_API_KEY environment variable is not set. Using MockLLM for local development.")
-		llmModel = &agent.MockLLM{}
-	} else {
-		var modelErr error
-		llmModel, modelErr = gemini.NewModel(context.Background(), "gemini-2.5-flash", nil)
-		if modelErr != nil {
-			slog.Error("failed to initialize gemini model", "error", modelErr)
-			os.Exit(1)
-		}
-		slog.Info("gemini model initialized successfully", "model", "gemini-2.5-flash")
+	// ── Initialize System Secrets Vault & Dynamic LLM Router ─────────────────
+	// Master encryption key should be injected via environment variable in production.
+	// For local development, we use a zeroed 32-byte key.
+	masterKey := make([]byte, 32)
+	secretsRepo, err := repository.NewSecretsRepository(queries, masterKey)
+	if err != nil {
+		slog.Error("failed to initialize secrets repository", "error", err)
+		os.Exit(1)
 	}
+
+	llmModel := agent.NewDynamicLLM(secretsRepo, "gemini-2.5-flash")
 
 	// ── Mera gateway route group ──────────────────────────────────────────────
 	meraHandler, err := mera.NewHandler(llmModel, synapseSvc, erpSvc, productRepo, knowledgeRepo)
