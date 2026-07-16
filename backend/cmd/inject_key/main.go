@@ -57,11 +57,8 @@ func main() {
 
 	// 3. Initialize secrets repository
 	// In production, this master encryption key must be securely provided via environment.
-	// For testing, we use a zeroed 32-byte key (matching what the test suite uses).
+	// For testing, we use a zeroed 32-byte key (matching what the server uses).
 	masterKey := make([]byte, 32)
-	for i := range masterKey {
-		masterKey[i] = byte(i)
-	}
 	
 	repo, err := repository.NewSecretsRepository(db.New(database), masterKey)
 	if err != nil {
