@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"fmt"
 	"iter"
 	"log/slog"
 	"os"
@@ -63,50 +64,88 @@ func (d *DynamicLLM) Name() string {
 
 // GenerateContent determines the tenant from the context, fetches their specific
 // API key if available, instantiates/caches a Gemini client, and routes the request.
+// It implements model routing: if the primary model fails, it falls back to the next model.
 func (d *DynamicLLM) GenerateContent(ctx context.Context, req *model.LLMRequest, stream bool) iter.Seq2[*model.LLMResponse, error] {
-	llm := d.resolveLLM(ctx)
-	return llm.GenerateContent(ctx, req, stream)
+	llms := d.resolveLLMs(ctx)
+
+	return func(yield func(*model.LLMResponse, error) bool) {
+		var lastErr error
+
+		for _, llm := range llms {
+			success := true
+			req.Model = llm.Name() // update request model name
+
+			next := llm.GenerateContent(ctx, req, stream)
+			next(func(resp *model.LLMResponse, err error) bool {
+				if err != nil {
+					lastErr = err
+					success = false
+					slog.Warn("DynamicLLM: model generation failed, attempting routing fallback", "model", llm.Name(), "error", err)
+					return false // stop this model's sequence
+				}
+				// Yield the successful response
+				return yield(resp, nil)
+			})
+
+			// If success is true, this model completed without errors, stop routing
+			if success {
+				return
+			}
+		}
+
+		if lastErr != nil {
+			yield(nil, fmt.Errorf("all models in routing chain failed, last error: %w", lastErr))
+		}
+	}
 }
 
-// resolveLLM finds the correct model.LLM to use for the current context.
-func (d *DynamicLLM) resolveLLM(ctx context.Context) model.LLM {
+// resolveLLMs finds the correct model.LLM chain to use for the current context.
+func (d *DynamicLLM) resolveLLMs(ctx context.Context) []model.LLM {
 	bizIDStr, err := repository.BusinessIDFromContext(ctx)
 	if err != nil {
 		slog.Warn("DynamicLLM: no business ID in context, using fallback LLM")
-		return d.fallbackLLM
+		return []model.LLM{d.fallbackLLM}
 	}
 
 	// 1. Check in-memory cache first
 	if cached, ok := d.clients.Load(bizIDStr); ok {
-		return cached.(model.LLM)
+		return cached.([]model.LLM)
 	}
 
 	// 2. Not in cache, check database for a custom key
 	bizID, err := uuid.Parse(bizIDStr)
 	if err != nil {
-		return d.fallbackLLM
+		return []model.LLM{d.fallbackLLM}
 	}
 
 	customKey, err := d.secretsRepo.GetSecret(ctx, bizID, domain.SecretKeyGeminiAPI)
 	if err != nil {
 		slog.Warn("DynamicLLM: failed to fetch custom key, using fallback", "business_id", bizIDStr, "error", err)
 	} else if customKey != "" {
-		// We found a custom key! Instantiate a dedicated client for this tenant.
-		customClient, err := gemini.NewModel(ctx, d.modelName, &genai.ClientConfig{
-			APIKey: customKey,
-		})
+		// Try to build a routing chain of models
+		fallbackModels := []string{d.modelName, "gemini-2.5-flash-lite", "gemini-2.0-flash"}
+		var clients []model.LLM
 		
-		if err == nil {
-			slog.Debug("DynamicLLM: instantiated custom Gemini client for tenant", "business_id", bizIDStr)
-			d.clients.Store(bizIDStr, customClient)
-			return customClient
+		for _, mName := range fallbackModels {
+			customClient, err := gemini.NewModel(ctx, mName, &genai.ClientConfig{
+				APIKey: customKey,
+			})
+			if err == nil {
+				clients = append(clients, customClient)
+			}
 		}
 		
-		slog.Error("DynamicLLM: failed to instantiate custom Gemini client, falling back", "business_id", bizIDStr, "error", err)
+		if len(clients) > 0 {
+			slog.Debug("DynamicLLM: instantiated custom Gemini routing chain for tenant", "business_id", bizIDStr, "chain_length", len(clients))
+			d.clients.Store(bizIDStr, clients)
+			return clients
+		}
+		
+		slog.Error("DynamicLLM: failed to instantiate any custom Gemini clients, falling back", "business_id", bizIDStr)
 	}
 
 	// 3. Fallback
-	return d.fallbackLLM
+	return []model.LLM{d.fallbackLLM}
 }
 
 // EmbedContent generates a 768-dimensional embedding for the given text using the business's API key.
