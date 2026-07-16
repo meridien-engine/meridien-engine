@@ -418,3 +418,82 @@ func (h *Handler) sendMetaPOST(url, token string, payload any) {
 		slog.Info("successfully dispatched message reply to meta", "url", url)
 	}
 }
+
+// ResolveSuspensionRequest defines the payload for resolving a suspended workflow.
+type ResolveSuspensionRequest struct {
+	CustomerID string `json:"customer_id"`
+	SessionID  string `json:"session_id"`
+	Resolution string `json:"resolution"` // "approve" or "reject"
+}
+
+// ResolveSuspension handles admin/HITL callbacks to resume suspended AI workflows.
+// It injects the resolution string into the ADK runner.
+func (h *Handler) ResolveSuspension(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	bodyBytes, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "failed to read request body", http.StatusBadRequest)
+		return
+	}
+
+	var req ResolveSuspensionRequest
+	if err := json.Unmarshal(bodyBytes, &req); err != nil {
+		http.Error(w, "invalid JSON payload", http.StatusBadRequest)
+		return
+	}
+
+	if req.CustomerID == "" || req.SessionID == "" || req.Resolution == "" {
+		http.Error(w, "missing required fields", http.StatusBadRequest)
+		return
+	}
+
+	// Wrap resolution as user input
+	inputContent := &genai.Content{
+		Role: "user",
+		Parts: []*genai.Part{
+			genai.NewPartFromText(req.Resolution),
+		},
+	}
+
+	runCfg := adkagent.RunConfig{}
+	var replyText string
+	var lastEvent *session.Event
+
+	for ev, err := range h.runner.Run(r.Context(), req.CustomerID, req.SessionID, inputContent, runCfg) {
+		if err != nil {
+			slog.Error("failed to resume workflow", "error", err)
+			http.Error(w, "workflow execution failed: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		lastEvent = ev
+		if ev.Output != nil {
+			if s, ok := ev.Output.(string); ok {
+				replyText = s
+			}
+		}
+	}
+
+	// Output success response
+	w.Header().Set("Content-Type", "application/json")
+	if replyText != "" {
+		// Egress dispatch logic goes here in a real app, 
+		// but for now we just return the reply so the caller knows the outcome.
+		json.NewEncoder(w).Encode(map[string]string{
+			"status": "resolved",
+			"reply":  replyText,
+		})
+	} else if lastEvent != nil && lastEvent.RequestedInput != nil {
+		json.NewEncoder(w).Encode(map[string]string{
+			"status": "suspended_again",
+			"prompt": lastEvent.RequestedInput.Message,
+		})
+	} else {
+		json.NewEncoder(w).Encode(map[string]string{
+			"status": "completed_no_reply",
+		})
+	}
+}

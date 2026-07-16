@@ -173,6 +173,7 @@ func main() {
 	r.Route("/api/v1/mera", func(r chi.Router) {
 		r.Use(middleware.JWTAuth)
 		r.Post("/webhook", meraHandler.Webhook)
+		r.Post("/suspend/resolve", meraHandler.ResolveSuspension)
 	})
 
 	// ── TODO: REST API routes for ERP portal, Compass dashboard ──────────────
