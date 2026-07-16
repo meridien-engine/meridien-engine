@@ -120,20 +120,32 @@ func NewMeraWorkflow(
 			ev := session.NewEvent(ctx, ctx.InvocationID())
 			msg := in.CustomerOutput.Message
 
+			products, _ := productRepo.List(ctx)
+			var catalogStr string
+			for _, p := range products {
+				catalogStr += fmt.Sprintf("- %s (SKU: %s, Price: $%s)\n", p.Name, p.SKU, p.Price.String())
+			}
+			if catalogStr == "" {
+				catalogStr = "No products available."
+			}
+
 			prompt := fmt.Sprintf(`You are the router for Meridien Engine. Analyze the customer's message:
 %q
 
+Available Product Catalog:
+%s
+
 Classify the intent into one of:
-- "CHECKOUT": If they want to purchase or buy one or more products.
+- "CHECKOUT": If they want to purchase or buy one or more products from the catalog.
 - "INQUIRY": If they are asking a question about a product, price, shipping, policies, or general questions.
 
-Respond ONLY with a JSON object in this format:
+Respond ONLY with a JSON object in this format. For "skus", you MUST use the exact SKU from the Available Product Catalog above:
 {
   "intent": "CHECKOUT" | "INQUIRY",
   "skus": ["SKU1", "SKU2"],
   "qtys": [1, 2]
 }
-`, msg)
+`, msg, catalogStr)
 
 			req := &model.LLMRequest{
 				Model: llmModel.Name(),
