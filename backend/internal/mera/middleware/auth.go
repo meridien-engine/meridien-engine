@@ -34,6 +34,9 @@ type jwtPayload struct {
 // to validate the third segment (signature) against header + payload.
 // Accepting unsigned or arbitrarily signed tokens is a critical security risk.
 func parseJWTClaims(token string) (businessID string, err error) {
+	// Remove any accidental whitespace (e.g., from copy-pasting)
+	token = strings.ReplaceAll(token, " ", "")
+	
 	parts := strings.Split(token, ".")
 	if len(parts) != 3 {
 		return "", fmt.Errorf("malformed JWT: expected 3 dot-separated segments, got %d", len(parts))
