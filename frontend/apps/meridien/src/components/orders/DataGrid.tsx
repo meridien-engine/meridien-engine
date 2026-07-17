@@ -69,13 +69,13 @@ export default function DataGrid() {
         <div class="bg-surface-container-low border border-circuit-grey rounded-2xl flex flex-col h-[calc(100vh-160px)]">
             
             {/* Toolbar */}
-            <div class="p-5 border-b border-circuit-grey flex items-center justify-between gap-4">
-                <div class="flex items-center gap-4 flex-1">
-                    <div class="relative w-80">
+            <div class="p-5 border-b border-circuit-grey flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                <div class="flex flex-col sm:flex-row sm:items-center gap-4 flex-1">
+                    <div class="relative w-full lg:w-80">
                         <svg class="w-4 h-4 text-terminal-dim absolute left-4 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
                         <input 
                             type="text" 
-                            placeholder="Search orders by ID or customer..." 
+                            placeholder="Search orders..." 
                             value={searchQuery()}
                             onInput={(e) => setSearchQuery(e.currentTarget.value)}
                             class="w-full bg-surface-container-lowest border border-circuit-grey rounded-full py-2 pl-10 pr-4 text-sm text-on-surface focus:outline-none focus:border-logic-teal transition-colors"
@@ -84,7 +84,7 @@ export default function DataGrid() {
                     <select 
                         value={statusFilter()}
                         onChange={(e) => setStatusFilter(e.currentTarget.value)}
-                        class="bg-surface-container-lowest border border-circuit-grey rounded-full py-2 px-4 pr-8 text-sm text-on-surface appearance-none focus:outline-none focus:border-logic-teal transition-colors cursor-pointer"
+                        class="w-full sm:w-auto bg-surface-container-lowest border border-circuit-grey rounded-full py-2 px-4 pr-8 text-sm text-on-surface appearance-none focus:outline-none focus:border-logic-teal transition-colors cursor-pointer"
                     >
                         <option value="All Statuses">All Statuses</option>
                         <option value="requires_action">Requires Action</option>
@@ -93,76 +93,82 @@ export default function DataGrid() {
                     </select>
                 </div>
 
-                <button class="bg-logic-teal hover:bg-logic-teal/90 text-white font-medium text-sm py-2 px-6 rounded-full transition-colors flex items-center gap-2">
+                <button class="w-full lg:w-auto bg-logic-teal hover:bg-logic-teal/90 text-white font-medium text-sm py-2 px-6 rounded-full transition-colors flex items-center justify-center gap-2">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                     Create Order
                 </button>
             </div>
 
-            {/* Table Header */}
-            <div class="flex items-center px-6 py-4 border-b border-circuit-grey bg-surface-container-low text-xs font-semibold text-on-surface-variant uppercase tracking-wider">
-                <div class="w-2/12 pr-4">Order ID</div>
-                <div class="w-3/12 pr-4">Customer</div>
-                <div class="w-2/12 pr-4">Date</div>
-                <div class="w-2/12 pr-4">Channel</div>
-                <div class="w-2/12 pr-4">Status</div>
-                <div class="w-1/12 text-right">Amount</div>
-            </div>
+            {/* Scrollable Table Area */}
+            <div class="flex-1 overflow-y-auto overflow-x-auto relative custom-scrollbar">
+                <div class="min-w-[900px] flex flex-col min-h-full">
+                    
+                    {/* Table Header */}
+                    <div class="flex items-center px-6 py-4 border-b border-circuit-grey bg-surface-container-low text-xs font-semibold text-on-surface-variant uppercase tracking-wider sticky top-0 z-20 shrink-0">
+                        <div class="w-2/12 pr-4">Order ID</div>
+                        <div class="w-3/12 pr-4">Customer</div>
+                        <div class="w-2/12 pr-4">Date</div>
+                        <div class="w-2/12 pr-4">Channel</div>
+                        <div class="w-2/12 pr-4">Status</div>
+                        <div class="w-1/12 text-right">Amount</div>
+                    </div>
 
-            {/* Table Body */}
-            <div class="flex-1 overflow-y-auto relative">
-                {orders.loading && (
-                    <div class="absolute inset-0 flex items-center justify-center bg-surface-container-low/50 backdrop-blur-sm z-10">
-                        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-logic-teal"></div>
-                    </div>
-                )}
-                {orders.error && (
-                    <div class="p-6 text-center text-warning-amber text-sm font-medium">
-                        Failed to load orders. Make sure the Go backend is running.
-                    </div>
-                )}
-                {!orders.loading && !orders.error && (
-                    <For each={filteredOrders()}>
-                        {(order) => (
-                            <div class="flex items-center px-6 py-4 border-b border-circuit-grey/50 hover:bg-surface-container-highest transition-colors group cursor-pointer">
-                                <div class="w-2/12 pr-4 font-mono text-sm font-medium text-on-surface">
-                                    {order.id}
-                                </div>
-                                <div class="w-3/12 pr-4 flex items-center gap-3">
-                                    <div class="w-8 h-8 rounded-full bg-logic-teal/10 flex-shrink-0 flex items-center justify-center text-logic-teal text-xs font-bold uppercase">
-                                        {order.customerName.charAt(0)}
-                                    </div>
-                                    <span class="text-sm font-medium text-on-surface truncate">{order.customerName}</span>
-                                </div>
-                                <div class="w-2/12 pr-4 text-sm text-on-surface-variant">
-                                    {new Date(order.date).toLocaleDateString()}
-                                </div>
-                                <div class="w-2/12 pr-4 flex items-center gap-2">
-                                    <span class="text-xs text-on-surface-variant capitalize">{order.channel}</span>
-                                    {order.aiHandled && (
-                                        <span class="w-4 h-4 bg-logic-teal/10 rounded-full flex-shrink-0 flex items-center justify-center" title="Handled by AI">
-                                            <svg class="w-2.5 h-2.5 text-logic-teal" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
-                                        </span>
-                                    )}
-                                </div>
-                                <div class="w-2/12 pr-4">
-                                    <span class={`text-[10px] font-bold px-3 py-1.5 rounded-full border whitespace-nowrap inline-flex items-center justify-center ${getStatusStyles(order.status)}`}>
-                                        {getStatusLabel(order.status)}
-                                    </span>
-                                </div>
-                                <div class="w-1/12 text-right font-mono text-sm text-on-surface">
-                                    ${order.amount.toFixed(2)}
-                                </div>
+                    {/* Table Body */}
+                    <div class="flex-1 relative">
+                        {orders.loading && (
+                            <div class="absolute inset-0 flex items-center justify-center bg-surface-container-low/50 backdrop-blur-sm z-10">
+                                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-logic-teal"></div>
                             </div>
                         )}
-                    </For>
-                )}
-                {(!orders.loading && !orders.error && filteredOrders().length === 0) && (
-                    <div class="flex flex-col items-center justify-center h-full text-terminal-dim py-12">
-                        <svg class="w-12 h-12 mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                        <p class="text-sm">No orders found matching your criteria.</p>
+                        {orders.error && (
+                            <div class="p-6 text-center text-warning-amber text-sm font-medium">
+                                Failed to load orders. Make sure the Go backend is running.
+                            </div>
+                        )}
+                        {!orders.loading && !orders.error && (
+                            <For each={filteredOrders()}>
+                                {(order) => (
+                                    <div class="flex items-center px-6 py-4 border-b border-circuit-grey/50 hover:bg-surface-container-highest transition-colors group cursor-pointer">
+                                        <div class="w-2/12 pr-4 font-mono text-sm font-medium text-on-surface">
+                                            {order.id}
+                                        </div>
+                                        <div class="w-3/12 pr-4 flex items-center gap-3">
+                                            <div class="w-8 h-8 rounded-full bg-logic-teal/10 flex-shrink-0 flex items-center justify-center text-logic-teal text-xs font-bold uppercase">
+                                                {order.customerName.charAt(0)}
+                                            </div>
+                                            <span class="text-sm font-medium text-on-surface truncate">{order.customerName}</span>
+                                        </div>
+                                        <div class="w-2/12 pr-4 text-sm text-on-surface-variant">
+                                            {new Date(order.date).toLocaleDateString()}
+                                        </div>
+                                        <div class="w-2/12 pr-4 flex items-center gap-2">
+                                            <span class="text-xs text-on-surface-variant capitalize">{order.channel}</span>
+                                            {order.aiHandled && (
+                                                <span class="w-4 h-4 bg-logic-teal/10 rounded-full flex-shrink-0 flex items-center justify-center" title="Handled by AI">
+                                                    <svg class="w-2.5 h-2.5 text-logic-teal" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div class="w-2/12 pr-4">
+                                            <span class={`text-[10px] font-bold px-3 py-1.5 rounded-full border whitespace-nowrap inline-flex items-center justify-center ${getStatusStyles(order.status)}`}>
+                                                {getStatusLabel(order.status)}
+                                            </span>
+                                        </div>
+                                        <div class="w-1/12 text-right font-mono text-sm text-on-surface">
+                                            ${order.amount.toFixed(2)}
+                                        </div>
+                                    </div>
+                                )}
+                            </For>
+                        )}
+                        {(!orders.loading && !orders.error && filteredOrders().length === 0) && (
+                            <div class="flex flex-col items-center justify-center h-full text-terminal-dim py-12">
+                                <svg class="w-12 h-12 mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                                <p class="text-sm">No orders found matching your criteria.</p>
+                            </div>
+                        )}
                     </div>
-                )}
+                </div>
             </div>
             
             {/* Pagination / Footer */}

@@ -47,8 +47,8 @@ export default function CustomerGrid() {
 
     return (
         <div class="bg-surface-container-low border border-circuit-grey rounded-2xl overflow-hidden">
-            <div class="overflow-x-auto">
-                <table class="w-full text-left text-sm text-on-surface">
+            <div class="overflow-x-auto custom-scrollbar">
+                <table class="w-full min-w-[900px] text-left text-sm text-on-surface">
                     <thead class="bg-surface-container uppercase text-[10px] tracking-wider text-on-surface-variant font-medium border-b border-circuit-grey">
                         <tr>
                             <th scope="col" class="px-6 py-4">Customer Name</th>
