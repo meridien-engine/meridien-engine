@@ -11,7 +11,7 @@ type OverviewMetricsData = {
 };
 
 const fetchMetrics = async (): Promise<OverviewMetricsData> => {
-    const response = await fetch('http://localhost:8080/api/v1/analytics/overview', {
+    const response = await fetch('/api/v1/analytics/overview', {
         headers: { 'Authorization': `Bearer ${DEV_JWT}` }
     });
     if (!response.ok) throw new Error('Failed to fetch metrics');

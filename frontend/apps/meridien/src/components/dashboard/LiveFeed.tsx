@@ -13,7 +13,7 @@ type FeedItem = {
 const DEV_JWT = "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJidXNpbmVzc19pZCI6IjNiODI1ZjIyLTczYTgtNDg3Zi05MGQxLTc5NGZkZjNlODFkZiJ9.";
 
 const fetchFeed = async (): Promise<FeedItem[]> => {
-    const response = await fetch('http://localhost:8080/api/v1/feed', {
+    const response = await fetch('/api/v1/feed', {
         headers: { 'Authorization': `Bearer ${DEV_JWT}` }
     });
     if (!response.ok) throw new Error('Failed to fetch feed');

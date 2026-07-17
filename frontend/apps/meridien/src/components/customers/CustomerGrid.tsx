@@ -13,7 +13,7 @@ type CustomerResponse = {
 };
 
 const fetchCustomers = async (): Promise<CustomerResponse[]> => {
-    const response = await fetch('http://localhost:8080/api/v1/customers', {
+    const response = await fetch('/api/v1/customers', {
         headers: { 'Authorization': `Bearer ${DEV_JWT}` }
     });
     if (!response.ok) throw new Error('Failed to fetch customers');

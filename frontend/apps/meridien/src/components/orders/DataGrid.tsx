@@ -17,7 +17,7 @@ const DEV_JWT = "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJidXNpbmVzc19pZCI6IjNiODI
 
 // Fetch orders from the Go backend
 const fetchOrders = async (): Promise<Order[]> => {
-    const response = await fetch('http://localhost:8080/api/v1/orders?limit=50', {
+    const response = await fetch('/api/v1/orders?limit=50', {
         headers: {
             'Authorization': `Bearer ${DEV_JWT}`
         }

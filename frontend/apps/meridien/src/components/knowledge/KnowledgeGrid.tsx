@@ -10,7 +10,7 @@ type KnowledgeNode = {
 };
 
 const fetchKnowledge = async (): Promise<KnowledgeNode[]> => {
-    const response = await fetch('http://localhost:8080/api/v1/knowledge', {
+    const response = await fetch('/api/v1/knowledge', {
         headers: { 'Authorization': `Bearer ${DEV_JWT}` }
     });
     if (!response.ok) throw new Error('Failed to fetch knowledge base');
@@ -31,7 +31,7 @@ export default function KnowledgeGrid() {
 
         setIsSubmitting(true);
         try {
-            const res = await fetch('http://localhost:8080/api/v1/knowledge', {
+            const res = await fetch('/api/v1/knowledge', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

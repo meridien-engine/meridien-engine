@@ -9,7 +9,7 @@ type RevenuePoint = {
 const DEV_JWT = "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJidXNpbmVzc19pZCI6IjNiODI1ZjIyLTczYTgtNDg3Zi05MGQxLTc5NGZkZjNlODFkZiJ9.";
 
 const fetchRevenue = async (): Promise<RevenuePoint[]> => {
-    const response = await fetch('http://localhost:8080/api/v1/analytics/revenue', {
+    const response = await fetch('/api/v1/analytics/revenue', {
         headers: { 'Authorization': `Bearer ${DEV_JWT}` }
     });
     if (!response.ok) throw new Error('Failed to fetch revenue');
