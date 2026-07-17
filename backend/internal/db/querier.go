@@ -67,6 +67,7 @@ type Querier interface {
 	ListBusinessCategories(ctx context.Context) ([]BusinessCategory, error)
 	ListBusinessMembers(ctx context.Context, businessID uuid.UUID) ([]ListBusinessMembersRow, error)
 	ListCustomers(ctx context.Context, arg ListCustomersParams) ([]ListCustomersRow, error)
+	ListHITLTraces(ctx context.Context, arg ListHITLTracesParams) ([]ListHITLTracesRow, error)
 	// Paginated list for Compass dashboard.
 	ListInteractionLogs(ctx context.Context, arg ListInteractionLogsParams) ([]InteractionLog, error)
 	ListInteractionLogsByCustomer(ctx context.Context, customerID uuid.UUID) ([]InteractionLog, error)
@@ -83,10 +84,11 @@ type Querier interface {
 	ReviewJoinRequest(ctx context.Context, arg ReviewJoinRequestParams) (JoinRequest, error)
 	SoftDeleteProduct(ctx context.Context, id uuid.UUID) error
 	SoftDeleteUser(ctx context.Context, id uuid.UUID) error
+	// Resolves a HITL suspension as timed_out (used by background job).
+	TimeoutHITLSuspension(ctx context.Context, traceID uuid.UUID) error
 	UpdateBusiness(ctx context.Context, arg UpdateBusinessParams) (Business, error)
 	UpdateCustomerTier(ctx context.Context, arg UpdateCustomerTierParams) (CustomerProfile, error)
-	// Resolves a HITL suspension (approved / rejected / timed_out).
-	UpdateHITLStatus(ctx context.Context, arg UpdateHITLStatusParams) (InteractionTrace, error)
+	UpdateHITLStatus(ctx context.Context, arg UpdateHITLStatusParams) error
 	UpdateMembershipRole(ctx context.Context, arg UpdateMembershipRoleParams) (UserBusinessMembership, error)
 	UpdateMembershipStatus(ctx context.Context, arg UpdateMembershipStatusParams) (UserBusinessMembership, error)
 	UpdateOrderStatus(ctx context.Context, arg UpdateOrderStatusParams) (Order, error)

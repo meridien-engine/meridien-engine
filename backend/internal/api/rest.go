@@ -31,6 +31,8 @@ func (h *RESTHandler) MountRoutes(r chi.Router) {
 	r.Get("/knowledge", h.ListKnowledge)
 	r.Post("/knowledge", h.AddKnowledge)
 	r.Get("/traces", h.ListTraces)
+	r.Get("/hitl", h.ListHITL)
+	r.Post("/hitl/{id}/resolve", h.ResolveHITL)
 }
 
 func (h *RESTHandler) ListOrders(w http.ResponseWriter, r *http.Request) {
@@ -543,3 +545,114 @@ func (h *RESTHandler) ListTraces(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(traces)
 }
 
+func (h *RESTHandler) ListHITL(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	ctx := r.Context()
+	
+	limit := 50
+	if l := r.URL.Query().Get("limit"); l != "" {
+		if parsed, err := strconv.Atoi(l); err == nil && parsed > 0 {
+			limit = parsed
+		}
+	}
+	
+	offset := 0
+	if o := r.URL.Query().Get("offset"); o != "" {
+		if parsed, err := strconv.Atoi(o); err == nil && parsed >= 0 {
+			offset = parsed
+		}
+	}
+
+	businessIDStr, err := repository.BusinessIDFromContext(ctx)
+	if err != nil {
+		http.Error(w, "unauthorized: "+err.Error(), http.StatusUnauthorized)
+		return
+	}
+
+	businessID, err := uuid.Parse(businessIDStr)
+	if err != nil {
+		http.Error(w, "invalid business id: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	arg := db.ListHITLTracesParams{
+		BusinessID: businessID,
+		Lim:        int32(limit),
+		Off:        int32(offset),
+	}
+
+	traces, err := h.queries.ListHITLTraces(ctx, arg)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if traces == nil {
+		traces = []db.ListHITLTracesRow{}
+	}
+	json.NewEncoder(w).Encode(traces)
+}
+
+func (h *RESTHandler) ResolveHITL(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	ctx := r.Context()
+
+	businessIDStr, err := repository.BusinessIDFromContext(ctx)
+	if err != nil {
+		http.Error(w, "unauthorized: "+err.Error(), http.StatusUnauthorized)
+		return
+	}
+
+	businessID, err := uuid.Parse(businessIDStr)
+	if err != nil {
+		http.Error(w, "invalid business id: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	traceIDStr := chi.URLParam(r, "id")
+	traceID, err := uuid.Parse(traceIDStr)
+	if err != nil {
+		http.Error(w, "invalid trace id: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	var req struct {
+		Status string `json:"status"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	arg := db.UpdateHITLStatusParams{
+		HitlStatus: req.Status,
+		TraceID:    traceID,
+		BusinessID: businessID,
+	}
+
+	err = h.queries.UpdateHITLStatus(ctx, arg)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]bool{"success": true})
+}

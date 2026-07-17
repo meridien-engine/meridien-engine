@@ -205,10 +205,7 @@ func (r *InteractionRepository) GetExpiredSuspensions(ctx context.Context) ([]hi
 // MarkTimedOut resolves an expired suspension by marking it as 'timed_out'.
 // Implements hitl.HITLRepository interface.
 func (r *InteractionRepository) MarkTimedOut(ctx context.Context, traceID uuid.UUID) error {
-	_, err := r.q.UpdateHITLStatus(ctx, db.UpdateHITLStatusParams{
-		Status:  string(domain.HITLStatusTimedOut),
-		TraceID: traceID,
-	})
+	err := r.q.TimeoutHITLSuspension(ctx, traceID)
 	if err != nil {
 		return fmt.Errorf("mark hitl suspension timed out: %w", err)
 	}
