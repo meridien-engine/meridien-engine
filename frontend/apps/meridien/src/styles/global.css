@@ -1,0 +1,164 @@
+@import "tailwindcss";
+
+/* Fonts: Inter, Manrope, JetBrains Mono as per design.md */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Manrope:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
+@theme {
+  --font-inter: 'Inter', sans-serif;
+  --font-manrope: 'Manrope', sans-serif;
+  --font-jetbrains-mono: 'JetBrains Mono', monospace;
+
+  /* We map standard Tailwind fonts to our dynamic ones */
+  --font-sans: var(--font-body);
+  --font-heading: var(--font-heading);
+  --font-mono: 'JetBrains Mono', monospace;
+
+  --color-logic-teal: var(--logic-teal);
+  --color-warning-amber: var(--warning-amber);
+  --color-void-black: var(--void-black);
+  --color-circuit-grey: var(--circuit-grey);
+  
+  --color-surface-lowest: var(--surface-container-lowest);
+  --color-surface-low: var(--surface-container-low);
+  --color-surface-high: var(--surface-container-high);
+  --color-surface-highest: var(--surface-container-highest);
+
+  --color-on-surface: var(--on-surface);
+  --color-on-surface-variant: var(--on-surface-variant);
+  --color-data-white: var(--data-white);
+  --color-terminal-dim: var(--terminal-dim);
+}
+
+@layer base {
+  :root {
+    --logic-teal: #c2652a; /* Sahara Orange */
+    --warning-amber: #d97706;
+
+    /* Light Theme Colors */
+    --void-black: #faf7f2;
+    --circuit-grey: #f2ede4;
+    --surface-container-lowest: #ffffff;
+    --surface-container-low: #f8f3eb;
+    --surface-container-high: #f0e9dd;
+    --surface-container-highest: #ebe4d8;
+
+    --on-surface: #2d2926;
+    --on-surface-variant: #6b5e54;
+    --data-white: #1a1a1a;
+    --terminal-dim: #94a3b8;
+    --circuit-dots-color: #d9d2c5;
+
+    /* Light Typography */
+    --font-heading: 'Manrope', sans-serif;
+    --font-body: 'Manrope', sans-serif;
+  }
+
+  .dark {
+    --warning-amber: #F59E0B;
+
+    /* Dark Theme Colors */
+    --void-black: #0A0A0A;
+    --circuit-grey: #1A1A1A;
+    --surface-container-lowest: #0e0e0e;
+    --surface-container-low: #1c1b1b;
+    --surface-container-high: #2a2a2a;
+    --surface-container-highest: #353534;
+
+    --on-surface: #e5e2e1;
+    --on-surface-variant: #bacac5;
+    --data-white: #F8FAFC;
+    --terminal-dim: #4B5563;
+    --circuit-dots-color: #1A1A1A;
+
+    /* Dark Typography */
+    --font-heading: 'JetBrains Mono', monospace;
+    --font-body: 'Inter', sans-serif;
+  }
+}
+
+body {
+  background-color: var(--void-black);
+  color: var(--on-surface);
+  font-family: var(--font-body);
+  transition: background-color 0.3s ease, color 0.3s ease;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
+}
+
+.font-code-snippet {
+  font-family: var(--font-mono);
+}
+
+/* Decorative Components */
+.circuit-dots {
+  background-image: radial-gradient(var(--circuit-dots-color) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+.scanline {
+  width: 100%;
+  height: 100px;
+  z-index: 9999;
+  position: fixed;
+  pointer-events: none;
+  background: linear-gradient(0deg, transparent 0%, rgba(194, 101, 42, 0.05) 50%, transparent 100%);
+  opacity: 0.1;
+  animation: scanline 8s linear infinite;
+}
+
+@keyframes scanline {
+  0% { transform: translateY(-100vh); }
+  100% { transform: translateY(100vh); }
+}
+
+.terminal-pulse {
+  animation: terminalPulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes terminalPulse {
+  0%, 100% { border-color: rgba(194, 101, 42, 1); box-shadow: 0 0 8px rgba(194, 101, 42, 0.5); }
+  50% { border-color: rgba(194, 101, 42, 0.3); box-shadow: 0 0 2px rgba(194, 101, 42, 0.1); }
+}
+
+.cursor-blink {
+  display: inline-block;
+  width: 8px;
+  height: 1em;
+  background-color: var(--logic-teal);
+  animation: blink 1s step-end infinite;
+  vertical-align: middle;
+  margin-left: 2px;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.glow-hover {
+  transition: all 0.2s ease-in-out;
+}
+.glow-hover:hover {
+  box-shadow: inset 0 0 10px rgba(194, 101, 42, 0.2), 0 0 10px rgba(194, 101, 42, 0.4);
+  border-color: var(--logic-teal);
+}
+
+/* Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--void-black);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--circuit-grey);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--logic-teal);
+}

@@ -70,6 +70,28 @@ func (m *mockOrderRepo) UpdateStatus(_ context.Context, id uuid.UUID, status dom
 	return nil, nil
 }
 
+func (m *mockOrderRepo) ListOrders(ctx context.Context, limit, offset int32) ([]domain.Order, error) {
+	return nil, nil
+}
+
+type mockSecretsRepo struct{}
+
+func (m *mockSecretsRepo) UpsertSecret(ctx context.Context, businessID uuid.UUID, keyName string, plaintextVal string) (*domain.SystemSecret, error) {
+	return nil, nil
+}
+
+func (m *mockSecretsRepo) GetSecret(ctx context.Context, businessID uuid.UUID, keyName string) (string, error) {
+	return "", nil
+}
+
+func (m *mockSecretsRepo) ListSecretKeys(ctx context.Context, businessID uuid.UUID) ([]domain.SystemSecret, error) {
+	return nil, nil
+}
+
+func (m *mockSecretsRepo) DeleteSecret(ctx context.Context, businessID uuid.UUID, keyName string) error {
+	return nil
+}
+
 type mockCustomerRepo struct {
 	profiles map[string]*domain.CustomerProfile
 }
@@ -163,7 +185,7 @@ func TestWebhookHandler_Success(t *testing.T) {
 
 	kRepo := &mockKnowledgeRepo{}
 
-	h, err := mera.NewHandler(&agent.MockLLM{}, synSvc, erpSvc, pRepo, kRepo)
+	h, err := mera.NewHandler(&agent.MockLLM{}, synSvc, erpSvc, pRepo, kRepo, &mockSecretsRepo{})
 	if err != nil {
 		t.Fatalf("failed to create handler: %v", err)
 	}
@@ -217,7 +239,7 @@ func TestWebhookHandler_Unauthorized(t *testing.T) {
 
 	kRepo := &mockKnowledgeRepo{}
 
-	h, err := mera.NewHandler(&agent.MockLLM{}, synSvc, erpSvc, pRepo, kRepo)
+	h, err := mera.NewHandler(&agent.MockLLM{}, synSvc, erpSvc, pRepo, kRepo, &mockSecretsRepo{})
 	if err != nil {
 		t.Fatalf("failed to create handler: %v", err)
 	}
@@ -252,7 +274,7 @@ func TestWebhookHandler_BadRequest(t *testing.T) {
 
 	kRepo := &mockKnowledgeRepo{}
 
-	h, err := mera.NewHandler(&agent.MockLLM{}, synSvc, erpSvc, pRepo, kRepo)
+	h, err := mera.NewHandler(&agent.MockLLM{}, synSvc, erpSvc, pRepo, kRepo, &mockSecretsRepo{})
 	if err != nil {
 		t.Fatalf("failed to create handler: %v", err)
 	}
@@ -285,7 +307,7 @@ func TestWebhookHandler_MetaVerification(t *testing.T) {
 	erpSvc := erp.NewService(pRepo, oRepo)
 	kRepo := &mockKnowledgeRepo{}
 
-	h, err := mera.NewHandler(&agent.MockLLM{}, synSvc, erpSvc, pRepo, kRepo)
+	h, err := mera.NewHandler(&agent.MockLLM{}, synSvc, erpSvc, pRepo, kRepo, &mockSecretsRepo{})
 	if err != nil {
 		t.Fatalf("failed to create handler: %v", err)
 	}
@@ -323,7 +345,7 @@ func TestWebhookHandler_MetaMessengerPayload(t *testing.T) {
 	erpSvc := erp.NewService(pRepo, oRepo)
 	kRepo := &mockKnowledgeRepo{}
 
-	h, err := mera.NewHandler(&agent.MockLLM{}, synSvc, erpSvc, pRepo, kRepo)
+	h, err := mera.NewHandler(&agent.MockLLM{}, synSvc, erpSvc, pRepo, kRepo, &mockSecretsRepo{})
 	if err != nil {
 		t.Fatalf("failed to create handler: %v", err)
 	}
@@ -373,7 +395,7 @@ func TestWebhookHandler_MetaWhatsAppPayload(t *testing.T) {
 	erpSvc := erp.NewService(pRepo, oRepo)
 	kRepo := &mockKnowledgeRepo{}
 
-	h, err := mera.NewHandler(&agent.MockLLM{}, synSvc, erpSvc, pRepo, kRepo)
+	h, err := mera.NewHandler(&agent.MockLLM{}, synSvc, erpSvc, pRepo, kRepo, &mockSecretsRepo{})
 	if err != nil {
 		t.Fatalf("failed to create handler: %v", err)
 	}

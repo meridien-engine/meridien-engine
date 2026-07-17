@@ -1,0 +1,71 @@
+package main
+
+import (
+	"context"
+	"database/sql"
+	"fmt"
+	"log"
+
+	"github.com/google/uuid"
+	_ "github.com/lib/pq"
+	"github.com/meridien-engine/meridien-engine/internal/db"
+	"github.com/meridien-engine/meridien-engine/internal/domain"
+	"github.com/meridien-engine/meridien-engine/internal/repository"
+)
+
+func main() {
+	connStr := "postgres://meridien:meridien@localhost:5432/meridien?sslmode=disable"
+	database, err := sql.Open("postgres", connStr)
+	if err != nil {
+		log.Fatalf("db: %v", err)
+	}
+	defer database.Close()
+
+	var bizStr = "3b825f22-73a8-487f-90d1-794fdf3e81df"
+	bizID, _ := uuid.Parse(bizStr)
+
+	masterKey := make([]byte, 32)
+	for i := range masterKey {
+		masterKey[i] = byte(i)
+	}
+
+	repo, err := repository.NewSecretsRepository(db.New(database), masterKey)
+	if err != nil {
+		log.Fatalf("repo: %v", err)
+	}
+
+	ctx := repository.WithBusinessID(context.Background(), bizStr)
+
+	// Since we patched the DB policy live, we have to make sure QueryWithTenant works
+	conn, err := database.Conn(ctx)
+	if err != nil {
+		log.Fatalf("conn: %v", err)
+	}
+	defer conn.Close()
+
+	
+	err = repository.QueryWithTenant(ctx, conn, bizStr, func() error {
+		row, err := db.New(database).GetSecret(ctx, db.GetSecretParams{
+			BusinessID: bizID,
+			KeyName:    domain.SecretKeyGeminiAPI,
+		})
+		if err != nil {
+			return fmt.Errorf("q.GetSecret: %w", err)
+		}
+		
+		// Note: in actual GetSecret we use SecretsRepository which decrypts
+		fmt.Printf("found row! encrypted_val length: %d\n", len(row.EncryptedVal))
+		return nil
+	})
+	
+	if err != nil {
+		fmt.Printf("QueryWithTenant error: %v\n", err)
+	}
+
+	key, err := repo.GetSecret(ctx, bizID, domain.SecretKeyGeminiAPI)
+	if err != nil {
+		log.Fatalf("GetSecret failed: %v", err)
+	}
+
+	fmt.Printf("Decrypted key length: %d\n", len(key))
+}

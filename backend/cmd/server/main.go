@@ -14,7 +14,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	_ "github.com/lib/pq"
 
-	"github.com/lmittmann/tint"
+	"github.com/meridien-engine/meridien-engine/internal/api"
 	"github.com/meridien-engine/meridien-engine/internal/db"
 	"github.com/meridien-engine/meridien-engine/internal/erp"
 	"github.com/meridien-engine/meridien-engine/internal/health"
@@ -25,6 +25,7 @@ import (
 	"github.com/meridien-engine/meridien-engine/internal/metrics"
 	"github.com/meridien-engine/meridien-engine/internal/repository"
 	"github.com/meridien-engine/meridien-engine/internal/synapse"
+	"github.com/lmittmann/tint"
 )
 
 // version is injected at build time via:
@@ -174,13 +175,12 @@ func main() {
 		r.Post("/suspend/resolve", meraHandler.ResolveSuspension)
 	})
 
-	// ── TODO: REST API routes for ERP portal, Compass dashboard ──────────────
-	// r.Route("/api/v1", func(r chi.Router) {
-	//     r.Route("/products", ...)
-	//     r.Route("/orders", ...)
-	//     r.Route("/customers", ...)
-	//     r.Route("/interactions", ...)
-	// })
+	// ── REST API routes for ERP portal, Compass dashboard ──────────────
+	restAPI := api.NewRESTHandler(erpSvc, queries)
+	r.Route("/api/v1", func(r chi.Router) {
+		r.Use(middleware.JWTAuth)
+		restAPI.MountRoutes(r)
+	})
 
 	// ── 9. HTTP server ────────────────────────────────────────────────────────
 	server := &http.Server{

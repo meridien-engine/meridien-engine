@@ -107,6 +107,10 @@ func (m *mockOrderRepo) UpdateStatus(_ context.Context, id uuid.UUID, status dom
 	return nil, domain.ErrNotFound
 }
 
+func (m *mockOrderRepo) ListOrders(ctx context.Context, limit, offset int32) ([]domain.Order, error) {
+	return nil, nil
+}
+
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 func TestPlaceOrder_Success(t *testing.T) {

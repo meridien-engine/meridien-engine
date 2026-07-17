@@ -107,6 +107,32 @@ func (r *OrderRepository) ListByCustomer(ctx context.Context, customerID uuid.UU
 	return out, nil
 }
 
+func (r *OrderRepository) ListOrders(ctx context.Context, limit, offset int32) ([]domain.Order, error) {
+	businessID, err := BusinessIDFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	bid, err := uuid.Parse(businessID)
+	if err != nil {
+		return nil, fmt.Errorf("invalid business id: %w", err)
+	}
+
+	rows, err := r.q.ListOrders(ctx, db.ListOrdersParams{
+		Limit:      limit,
+		Offset:     offset,
+		BusinessID: bid,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("list orders: %w", err)
+	}
+	out := make([]domain.Order, len(rows))
+	for i, row := range rows {
+		out[i] = *mapOrder(row, nil)
+	}
+	return out, nil
+}
+
 func (r *OrderRepository) UpdateStatus(ctx context.Context, id uuid.UUID, status domain.OrderStatus) (*domain.Order, error) {
 	businessID, err := BusinessIDFromContext(ctx)
 	if err != nil {

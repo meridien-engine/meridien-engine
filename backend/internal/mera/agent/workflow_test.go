@@ -58,6 +58,10 @@ func (m *mockOrderRepo) ListByCustomer(_ context.Context, customerID uuid.UUID) 
 	return nil, nil
 }
 
+func (m *mockOrderRepo) ListOrders(ctx context.Context, limit, offset int32) ([]domain.Order, error) {
+	return nil, nil
+}
+
 func (m *mockOrderRepo) UpdateStatus(_ context.Context, id uuid.UUID, status domain.OrderStatus) (*domain.Order, error) {
 	return nil, nil
 }

@@ -81,6 +81,28 @@ func (m *mockIntegrationOrderRepo) UpdateStatus(_ context.Context, id uuid.UUID,
 	return nil, nil
 }
 
+func (m *mockIntegrationOrderRepo) ListOrders(ctx context.Context, limit, offset int32) ([]domain.Order, error) {
+	return nil, nil
+}
+
+type mockIntegrationSecretsRepo struct{}
+
+func (m *mockIntegrationSecretsRepo) UpsertSecret(ctx context.Context, businessID uuid.UUID, keyName string, plaintextVal string) (*domain.SystemSecret, error) {
+	return nil, nil
+}
+
+func (m *mockIntegrationSecretsRepo) GetSecret(ctx context.Context, businessID uuid.UUID, keyName string) (string, error) {
+	return "", nil
+}
+
+func (m *mockIntegrationSecretsRepo) ListSecretKeys(ctx context.Context, businessID uuid.UUID) ([]domain.SystemSecret, error) {
+	return nil, nil
+}
+
+func (m *mockIntegrationSecretsRepo) DeleteSecret(ctx context.Context, businessID uuid.UUID, keyName string) error {
+	return nil
+}
+
 type mockIntegrationCustomerRepo struct {
 	profiles map[string]*domain.CustomerProfile
 }
@@ -197,7 +219,7 @@ func TestMeraWorkflow_PriceMismatch_HITLSuspension_And_Timeout(t *testing.T) {
 
 	kRepo := &mockKnowledgeRepo{}
 
-	h, err := mera.NewHandler(&agent.MockLLM{}, synSvc, erpSvc, pRepo, kRepo)
+	h, err := mera.NewHandler(&agent.MockLLM{}, synSvc, erpSvc, pRepo, kRepo, &mockIntegrationSecretsRepo{})
 	if err != nil {
 		t.Fatalf("failed to create handler: %v", err)
 	}

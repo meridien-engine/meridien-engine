@@ -36,17 +36,20 @@ type Querier interface {
 	// Primary Synapse lookup: find a customer from their external channel ID.
 	GetCustomerByChannel(ctx context.Context, arg GetCustomerByChannelParams) (CustomerProfile, error)
 	GetCustomerProfileByID(ctx context.Context, id uuid.UUID) (CustomerProfile, error)
+	GetDashboardOverviewMetrics(ctx context.Context, businessID uuid.UUID) (GetDashboardOverviewMetricsRow, error)
 	// Returns all traces that are still 'pending' and have passed their TTL.
 	// Run by the background expiry checker goroutine on a ticker.
 	GetExpiredHITLSuspensions(ctx context.Context) ([]InteractionTrace, error)
 	// Fetches a single interaction log and its associated trace for Compass.
 	GetInteractionWithTrace(ctx context.Context, id uuid.UUID) (GetInteractionWithTraceRow, error)
 	GetInvitationByToken(ctx context.Context, token string) (Invitation, error)
+	GetLiveFeed(ctx context.Context, businessID uuid.UUID) ([]GetLiveFeedRow, error)
 	GetMembership(ctx context.Context, arg GetMembershipParams) (UserBusinessMembership, error)
 	GetOrderByID(ctx context.Context, id uuid.UUID) (Order, error)
 	GetPendingJoinRequest(ctx context.Context, arg GetPendingJoinRequestParams) (JoinRequest, error)
 	GetProductByID(ctx context.Context, id uuid.UUID) (Product, error)
 	GetProductBySKU(ctx context.Context, arg GetProductBySKUParams) (Product, error)
+	GetRevenueLast7Days(ctx context.Context, businessID uuid.UUID) ([]GetRevenueLast7DaysRow, error)
 	// Retrieves a single encrypted secret by business + key name.
 	GetSecret(ctx context.Context, arg GetSecretParams) (SystemSecret, error)
 	// queries/users.sql
@@ -62,10 +65,12 @@ type Querier interface {
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
 	ListBusinessCategories(ctx context.Context) ([]BusinessCategory, error)
 	ListBusinessMembers(ctx context.Context, businessID uuid.UUID) ([]ListBusinessMembersRow, error)
+	ListCustomers(ctx context.Context, arg ListCustomersParams) ([]ListCustomersRow, error)
 	// Paginated list for Compass dashboard.
 	ListInteractionLogs(ctx context.Context, arg ListInteractionLogsParams) ([]InteractionLog, error)
 	ListInteractionLogsByCustomer(ctx context.Context, customerID uuid.UUID) ([]InteractionLog, error)
 	ListOrderItems(ctx context.Context, orderID uuid.UUID) ([]OrderItem, error)
+	ListOrders(ctx context.Context, arg ListOrdersParams) ([]Order, error)
 	ListOrdersByCustomer(ctx context.Context, customerID uuid.UUID) ([]Order, error)
 	ListPendingJoinRequests(ctx context.Context, businessID uuid.UUID) ([]ListPendingJoinRequestsRow, error)
 	ListProducts(ctx context.Context) ([]Product, error)

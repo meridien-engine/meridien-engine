@@ -27,7 +27,7 @@ func (m *MockLLM) GenerateContent(ctx context.Context, req *model.LLMRequest, st
 
 		// Mock the intent router response
 		if strings.Contains(prompt, "Classify the intent") {
-			idx := strings.Index(prompt, "Analyze the customer's message:")
+			idx := strings.Index(prompt, "Analyze the customer's message")
 			msg := ""
 			if idx != -1 {
 				sub := prompt[idx:]
