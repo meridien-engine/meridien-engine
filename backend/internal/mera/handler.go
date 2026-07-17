@@ -4,6 +4,7 @@ package mera
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -12,9 +13,11 @@ import (
 	"os"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/meridien-engine/meridien-engine/internal/domain"
 	"github.com/meridien-engine/meridien-engine/internal/erp"
 	"github.com/meridien-engine/meridien-engine/internal/mera/agent"
+	"github.com/meridien-engine/meridien-engine/internal/repository"
 	"github.com/meridien-engine/meridien-engine/internal/synapse"
 	adkagent "google.golang.org/adk/v2/agent"
 	"google.golang.org/adk/v2/model"
@@ -107,8 +110,9 @@ type MetaWhatsAppText struct {
 
 // Handler orchestrates incoming customer communication.
 type Handler struct {
-	synapseSvc *synapse.Service
-	runner     *runner.Runner
+	synapseSvc  *synapse.Service
+	runner      *runner.Runner
+	secretsRepo repository.SecretsRepository
 }
 
 // NewHandler creates a Handler with dependencies wired.
@@ -118,6 +122,7 @@ func NewHandler(
 	erpSvc *erp.Service,
 	pRepo domain.ProductRepository,
 	kRepo domain.KnowledgeRepository,
+	sRepo repository.SecretsRepository,
 ) (*Handler, error) {
 	// Construct the ADK workflow agent graph
 	wfAgent, err := agent.NewMeraWorkflow(llmModel, synSvc, erpSvc, pRepo, kRepo)
@@ -140,8 +145,9 @@ func NewHandler(
 	}
 
 	return &Handler{
-		synapseSvc: synSvc,
-		runner:     r,
+		synapseSvc:  synSvc,
+		runner:      r,
+		secretsRepo: sRepo,
 	}, nil
 }
 
@@ -288,6 +294,12 @@ func (h *Handler) Webhook(w http.ResponseWriter, r *http.Request) {
 	// 6. Asynchronously dispatch the egress reply back to Meta APIs if configured
 	go h.dispatchMetaReply(req.Channel, req.ChannelExternalID, replyText)
 
+	// 6.5. Asynchronously trigger Gemma-4 semantic summarization!
+	bizIDStr, _ := repository.BusinessIDFromContext(r.Context())
+	if bizID, err := uuid.Parse(bizIDStr); err == nil {
+		go h.asyncSummarizeCustomer(bizID, profile)
+	}
+
 	// 7. Reply to channel / client
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(WebhookResponse{
@@ -316,6 +328,87 @@ func (h *Handler) verifyMetaWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.Error(w, "forbidden", http.StatusForbidden)
+}
+
+// asyncSummarizeCustomer is the Synapse Background Worker that uses Gemma-4 to update semantic memory.
+func (h *Handler) asyncSummarizeCustomer(bizID uuid.UUID, profile *domain.CustomerProfile) {
+	// Use a fresh background context with a timeout since the HTTP request context is cancelled.
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	// Need to set the tenant in context so repos work
+	ctx = repository.WithBusinessID(ctx, bizID.String())
+
+	// 1. Fetch recent interactions (e.g., last 10)
+	logs, err := h.synapseSvc.ListInteractionsByCustomer(ctx, profile.ID)
+	if err != nil || len(logs) == 0 {
+		return
+	}
+
+	// 2. Fetch the API key for this tenant
+	apiKey, err := h.secretsRepo.GetSecret(ctx, bizID, domain.SecretKeyGeminiAPI)
+	if err != nil || apiKey == "" {
+		apiKey = os.Getenv("GEMINI_API_KEY")
+		if apiKey == "" {
+			return
+		}
+	}
+
+	// 3. Initialize GenAI client
+	client, err := genai.NewClient(ctx, &genai.ClientConfig{APIKey: apiKey})
+	if err != nil {
+		slog.Error("asyncSummarizeCustomer: failed to init client", "error", err)
+		return
+	}
+
+	// 4. Construct prompt
+	var history string
+	// Take up to 10 most recent logs
+	limit := len(logs)
+	if limit > 10 {
+		limit = 10
+	}
+	for i := 0; i < limit; i++ {
+		l := logs[i] // Note: list returns newest first, so we reverse it or just list them.
+		history += fmt.Sprintf("[%s] Customer: %s\n[%s] AI: %s\n\n",
+			l.CreatedAt.Format(time.RFC3339), l.InboundMsg,
+			l.CreatedAt.Format(time.RFC3339), l.OutboundMsg)
+	}
+
+	prompt := fmt.Sprintf(`You are a background summarization AI.
+Your task is to maintain a concise, up-to-date "semantic summary" of a customer's preferences, personality, and journey state.
+
+Current Summary:
+%s
+
+Recent Interactions (most recent first):
+%s
+
+Instructions:
+1. Update the summary to include any new preferences, friction points, or state changes from the recent interactions.
+2. Discard outdated information that is no longer relevant (Time Decay).
+3. Keep it to a single concise paragraph.
+4. Do not output anything other than the new summary.
+
+New Summary:`, profile.SemanticSummary, history)
+
+	// 5. Call Gemma 4 26B
+	resp, err := client.Models.GenerateContent(ctx, "models/gemma-4-26b-a4b-it", genai.Text(prompt), nil)
+	if err != nil {
+		slog.Error("asyncSummarizeCustomer: Gemma generation failed", "error", err)
+		return
+	}
+
+	if len(resp.Candidates) > 0 && len(resp.Candidates[0].Content.Parts) > 0 {
+		newSummary := resp.Candidates[0].Content.Parts[0].Text
+		
+		// 6. Save back to the database
+		if err := h.synapseSvc.UpdateSemanticSummary(ctx, profile.ID, newSummary); err != nil {
+			slog.Error("asyncSummarizeCustomer: failed to update DB", "error", err)
+		} else {
+			slog.Info("asyncSummarizeCustomer: successfully updated semantic summary", "customer_id", profile.ID)
+		}
+	}
 }
 
 // parseMetaPayload extracts message content, channel type, and sender ID from raw Meta payloads.

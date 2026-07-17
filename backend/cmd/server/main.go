@@ -160,7 +160,7 @@ func main() {
 	llmModel := agent.NewDynamicLLM(secretsRepo, "gemini-2.5-flash")
 
 	// ── Mera gateway route group ──────────────────────────────────────────────
-	meraHandler, err := mera.NewHandler(llmModel, synapseSvc, erpSvc, productRepo, knowledgeRepo)
+	meraHandler, err := mera.NewHandler(llmModel, synapseSvc, erpSvc, productRepo, knowledgeRepo, secretsRepo)
 	if err != nil {
 		slog.Error("failed to create mera handler", "error", err)
 		os.Exit(1)
