@@ -23,6 +23,7 @@ type CustomerResolutionOutput struct {
 	Message  string                  `json:"message"`
 	Customer *domain.CustomerProfile `json:"customer"`
 	IsNew    bool                    `json:"is_new"`
+	History  []domain.InteractionLog `json:"history"`
 }
 
 // RAGRetrievalOutput represents the enriched state after RAG vector search.
@@ -45,7 +46,18 @@ type LLMRouterResponse struct {
 	Qtys   []int32  `json:"qtys"`
 }
 
-// mockEmbedding generates a dummy 1536-dimensional embedding slice for local development.
+func formatHistory(logs []domain.InteractionLog) string {
+	if len(logs) == 0 {
+		return "No prior conversation history."
+	}
+	var sb strings.Builder
+	// logs are newest-first, we want to read them oldest-first for context flow
+	for i := len(logs) - 1; i >= 0; i-- {
+		l := logs[i]
+		sb.WriteString(fmt.Sprintf("Customer: %s\nAI: %s\n\n", l.InboundMsg, l.OutboundMsg))
+	}
+	return sb.String()
+}
 
 // NewMeraWorkflow constructs and wires the ADK workflow graph for Mera reasoning loops.
 func NewMeraWorkflow(
@@ -79,10 +91,24 @@ func NewMeraWorkflow(
 			if err != nil {
 				return CustomerResolutionOutput{}, fmt.Errorf("resolve customer node: %w", err)
 			}
+
+			// Fetch short-term history (e.g. last 5 turns) for context
+			var history []domain.InteractionLog
+			logs, err := synSvc.ListInteractionsByCustomer(ctx, profile.ID)
+			if err == nil {
+				// Take up to 5 most recent
+				limit := len(logs)
+				if limit > 5 {
+					limit = 5
+				}
+				history = logs[:limit]
+			}
+
 			return CustomerResolutionOutput{
 				Message:  in,
 				Customer: profile,
 				IsNew:    isNew,
+				History:  history,
 			}, nil
 		},
 		workflow.NodeConfig{},
@@ -129,7 +155,12 @@ func NewMeraWorkflow(
 				catalogStr = "No products available."
 			}
 
-			prompt := fmt.Sprintf(`You are the router for Meridien Engine. Analyze the customer's message:
+			prompt := fmt.Sprintf(`You are the router for Meridien Engine. Analyze the customer's message and the conversation history to determine their intent.
+
+Recent Conversation History:
+%s
+
+Customer's Latest Message:
 %q
 
 Available Product Catalog:
@@ -145,7 +176,7 @@ Respond ONLY with a JSON object in this format. For "skus", you MUST use the exa
   "skus": ["SKU1", "SKU2"],
   "qtys": [1, 2]
 }
-`, msg, catalogStr)
+`, formatHistory(in.CustomerOutput.History), msg, catalogStr)
 
 			req := &model.LLMRequest{
 				Model: llmModel.Name(),
@@ -262,11 +293,14 @@ Respond ONLY with a JSON object in this format. For "skus", you MUST use the exa
 Answer the customer's question politely and accurately using ONLY the provided knowledge sources.
 If the answer is not in the knowledge sources, say politely that you don't know or ask them to contact support.
 
+Recent Conversation History:
+%s
+
 Customer message: %q
 
 Knowledge sources:
 %s
-`, in.CustomerOutput.Message, contextStr)
+`, formatHistory(in.CustomerOutput.History), in.CustomerOutput.Message, contextStr)
 
 			req := &model.LLMRequest{
 				Model: llmModel.Name(),

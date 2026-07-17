@@ -14,6 +14,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	_ "github.com/lib/pq"
 
+	"github.com/lmittmann/tint"
 	"github.com/meridien-engine/meridien-engine/internal/db"
 	"github.com/meridien-engine/meridien-engine/internal/erp"
 	"github.com/meridien-engine/meridien-engine/internal/health"
@@ -24,17 +25,19 @@ import (
 	"github.com/meridien-engine/meridien-engine/internal/metrics"
 	"github.com/meridien-engine/meridien-engine/internal/repository"
 	"github.com/meridien-engine/meridien-engine/internal/synapse"
-
 )
 
 // version is injected at build time via:
-//   go build -ldflags="-X main.version=v0.1.0" ./cmd/server
+//
+//	go build -ldflags="-X main.version=v0.1.0" ./cmd/server
 var version = "dev"
 
 func main() {
 	// ── 1. Structured logger ──────────────────────────────────────────────────
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
-		Level: slog.LevelInfo,
+	// Use tint for beautiful colorful logs in the local terminal
+	logger := slog.New(tint.NewHandler(os.Stdout, &tint.Options{
+		Level:      slog.LevelInfo,
+		TimeFormat: time.Kitchen,
 	}))
 	slog.SetDefault(logger)
 
@@ -127,7 +130,7 @@ func main() {
 		return metrics.Middleware(next)
 	})
 
-		// ── Health & observability endpoints ──────────────────────────────────────
+	// ── Health & observability endpoints ──────────────────────────────────────
 	r.Get("/healthz", healthChecker.Liveness)
 	r.Get("/readyz", healthChecker.Readiness)
 	r.Handle("/metrics", metrics.Handler())
@@ -203,7 +206,6 @@ func main() {
 	<-quit
 	slog.Info("shutdown signal received")
 	bgCancel() // stop background tasks (including HITL checker)
-
 
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer shutdownCancel()
