@@ -29,7 +29,7 @@ export default function OverviewMetrics() {
     };
 
     return (
-        <div class="col-span-12 grid grid-cols-4 gap-6">
+        <div class="col-span-12 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {/* Revenue */}
             <div class="bg-surface-container-low border border-circuit-grey rounded-2xl p-6 relative overflow-hidden group hover:border-logic-teal transition-colors">
                 <div class="absolute inset-0 bg-logic-teal/5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>

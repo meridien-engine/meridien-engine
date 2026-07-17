@@ -26,18 +26,37 @@ const { title } = Astro.props;
             <span id="toast-message" class="text-sm font-code-snippet">Notification</span>
         </div>
 
+        <!-- Mobile Header (Visible only on small screens) -->
+        <div class="md:hidden flex items-center justify-between p-4 bg-void-black/80 backdrop-blur-md border-b border-circuit-grey fixed top-0 left-0 right-0 z-50">
+            <div class="flex items-center gap-2">
+                <div class="w-6 h-6 flex-shrink-0 border border-logic-teal/30 rounded flex items-center justify-center bg-logic-teal/5">
+                    <span class="text-logic-teal font-bold text-xs">M</span>
+                </div>
+                <h1 class="text-sm font-bold tracking-tight text-on-surface font-heading">Meridien</h1>
+            </div>
+            <button id="mobile-menu-btn" class="text-on-surface-variant hover:text-logic-teal transition-colors">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+            </button>
+        </div>
+
         <!-- Persistent Navigation Sidebar -->
-        <aside class="w-[280px] bg-void-black/80 backdrop-blur-md border-r border-circuit-grey flex flex-col justify-between p-6 shrink-0 fixed h-full z-40">
+        <aside id="sidebar" class="w-[280px] bg-void-black/95 md:bg-void-black/80 backdrop-blur-md border-r border-circuit-grey flex flex-col justify-between p-6 shrink-0 fixed h-full z-40 transition-transform duration-300 -translate-x-full md:translate-x-0">
             <div>
                 <!-- Platform Brand & Logo -->
-                <div class="flex items-center gap-3 mb-10">
-                    <div class="relative w-8 h-8 flex-shrink-0 border border-logic-teal/30 rounded-lg flex items-center justify-center bg-logic-teal/5">
-                        <span class="text-logic-teal font-bold text-lg">M</span>
+                <div class="flex items-center justify-between mb-10">
+                    <div class="flex items-center gap-3">
+                        <div class="relative w-8 h-8 flex-shrink-0 border border-logic-teal/30 rounded-lg flex items-center justify-center bg-logic-teal/5">
+                            <span class="text-logic-teal font-bold text-lg">M</span>
+                        </div>
+                        <div>
+                            <h1 class="text-lg font-bold tracking-tight text-on-surface font-heading">Meridien</h1>
+                            <span class="text-[10px] uppercase tracking-wider text-on-surface-variant font-semibold">Engine Core</span>
+                        </div>
                     </div>
-                    <div>
-                        <h1 class="text-lg font-bold tracking-tight text-on-surface font-heading">Meridien</h1>
-                        <span class="text-[10px] uppercase tracking-wider text-on-surface-variant font-semibold">Engine Core</span>
-                    </div>
+                    <!-- Close button for mobile -->
+                    <button id="close-sidebar-btn" class="md:hidden text-on-surface-variant hover:text-white">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
                 </div>
 
                 <!-- Nav Links -->
@@ -73,7 +92,7 @@ const { title } = Astro.props;
             </div>
             
             <!-- Bottom Settings / User -->
-            <div class="space-y-1 pt-6 border-t border-circuit-grey text-sm font-medium">
+            <div class="space-y-1 pt-6 border-t border-circuit-grey text-sm font-medium mt-6">
                 <a href="/settings" class="flex items-center gap-3 px-4 py-2.5 text-on-surface-variant hover:text-logic-teal transition-all group border-l-2 border-transparent hover:border-logic-teal/50 hover:bg-surface-container-low/50 rounded-r-xl">
                     <svg class="w-4 h-4 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                     Settings
@@ -89,8 +108,24 @@ const { title } = Astro.props;
         </aside>
 
         <!-- Main Content Area -->
-        <main class="flex-1 ml-[280px] p-8 relative z-10">
+        <main class="flex-1 ml-0 md:ml-[280px] p-4 md:p-8 pt-20 md:pt-8 relative z-10 w-full overflow-x-hidden">
             <slot />
         </main>
+
+        <script>
+            // Mobile Sidebar Toggle Logic
+            const menuBtn = document.getElementById('mobile-menu-btn');
+            const closeBtn = document.getElementById('close-sidebar-btn');
+            const sidebar = document.getElementById('sidebar');
+
+            if (menuBtn && closeBtn && sidebar) {
+                menuBtn.addEventListener('click', () => {
+                    sidebar.classList.remove('-translate-x-full');
+                });
+                closeBtn.addEventListener('click', () => {
+                    sidebar.classList.add('-translate-x-full');
+                });
+            }
+        </script>
 	</body>
 </html>

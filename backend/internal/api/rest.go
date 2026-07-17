@@ -28,6 +28,8 @@ func (h *RESTHandler) MountRoutes(r chi.Router) {
 	r.Get("/analytics/revenue", h.RevenueChart)
 	r.Get("/analytics/overview", h.DashboardOverview)
 	r.Get("/customers", h.ListCustomers)
+	r.Get("/knowledge", h.ListKnowledge)
+	r.Post("/knowledge", h.AddKnowledge)
 }
 
 func (h *RESTHandler) ListOrders(w http.ResponseWriter, r *http.Request) {
@@ -362,5 +364,124 @@ func (h *RESTHandler) ListCustomers(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(resp)
+}
+
+func (h *RESTHandler) ListKnowledge(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	ctx := r.Context()
+	
+	businessIDStr, err := repository.BusinessIDFromContext(ctx)
+	if err != nil {
+		http.Error(w, "unauthorized: "+err.Error(), http.StatusUnauthorized)
+		return
+	}
+
+	businessID, err := uuid.Parse(businessIDStr)
+	if err != nil {
+		http.Error(w, "invalid business id: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	nodes, err := h.queries.ListKnowledgeNodes(ctx, businessID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	type KnowledgeResponse struct {
+		ID         string `json:"id"`
+		SourceName string `json:"source_name"`
+		Preview    string `json:"preview"`
+		CreatedAt  string `json:"created_at"`
+	}
+
+	var resp []KnowledgeResponse
+	for _, n := range nodes {
+		resp = append(resp, KnowledgeResponse{
+			ID:         n.ID.String(),
+			SourceName: n.SourceName,
+			Preview:    n.ContentPreview,
+			CreatedAt:  n.CreatedAt.Format(time.RFC3339),
+		})
+	}
+
+	if resp == nil {
+		resp = []KnowledgeResponse{}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
+}
+
+func (h *RESTHandler) AddKnowledge(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	ctx := r.Context()
+
+	businessIDStr, err := repository.BusinessIDFromContext(ctx)
+	if err != nil {
+		http.Error(w, "unauthorized: "+err.Error(), http.StatusUnauthorized)
+		return
+	}
+
+	businessID, err := uuid.Parse(businessIDStr)
+	if err != nil {
+		http.Error(w, "invalid business id: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	var req struct {
+		SourceName string `json:"source_name"`
+		Content    string `json:"content"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	// Generate a dummy embedding array/string of 768 zeros
+	embeddingStr := "["
+	for i := 0; i < 768; i++ {
+		if i > 0 {
+			embeddingStr += ","
+		}
+		embeddingStr += "0.0"
+	}
+	embeddingStr += "]"
+
+	arg := db.InsertKnowledgeNodeParams{
+		BusinessID: businessID,
+		SourceName: req.SourceName,
+		Content:    req.Content,
+		Column4:    embeddingStr,
+	}
+
+	id, err := h.queries.InsertKnowledgeNode(ctx, arg)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"id":      id.String(),
+		"success": true,
+	})
 }
 

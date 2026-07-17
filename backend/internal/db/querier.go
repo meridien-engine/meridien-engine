@@ -63,12 +63,14 @@ type Querier interface {
 	//   :execrows → returns rows affected + error
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
+	InsertKnowledgeNode(ctx context.Context, arg InsertKnowledgeNodeParams) (uuid.UUID, error)
 	ListBusinessCategories(ctx context.Context) ([]BusinessCategory, error)
 	ListBusinessMembers(ctx context.Context, businessID uuid.UUID) ([]ListBusinessMembersRow, error)
 	ListCustomers(ctx context.Context, arg ListCustomersParams) ([]ListCustomersRow, error)
 	// Paginated list for Compass dashboard.
 	ListInteractionLogs(ctx context.Context, arg ListInteractionLogsParams) ([]InteractionLog, error)
 	ListInteractionLogsByCustomer(ctx context.Context, customerID uuid.UUID) ([]InteractionLog, error)
+	ListKnowledgeNodes(ctx context.Context, businessID uuid.UUID) ([]ListKnowledgeNodesRow, error)
 	ListOrderItems(ctx context.Context, orderID uuid.UUID) ([]OrderItem, error)
 	ListOrders(ctx context.Context, arg ListOrdersParams) ([]Order, error)
 	ListOrdersByCustomer(ctx context.Context, customerID uuid.UUID) ([]Order, error)

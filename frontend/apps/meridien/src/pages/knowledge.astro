@@ -1,0 +1,29 @@
+---
+import Layout from '../layouts/Layout.astro';
+import KnowledgeGrid from '../components/knowledge/KnowledgeGrid';
+---
+
+<Layout title="Meridien Merchant Portal - Knowledge Base">
+    <!-- Topbar -->
+    <header class="flex items-center justify-between mb-10 border-b border-circuit-grey pb-6">
+        <div>
+            <h2 class="text-3xl font-bold tracking-tight text-on-surface font-heading flex items-center gap-3">
+                <svg class="w-7 h-7 text-logic-teal" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+                Synapse Knowledge Base
+            </h2>
+            <p class="text-on-surface-variant mt-2 text-sm">Manage the documents and context your AI uses for RAG answering.</p>
+        </div>
+        <div class="flex items-center gap-6">
+            <!-- Search -->
+            <div class="relative group">
+                <svg class="w-4 h-4 text-logic-teal absolute left-4 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                <input type="text" placeholder="Search the vector database..." class="bg-surface-container-lowest border border-circuit-grey rounded-full py-2.5 pl-10 pr-5 text-sm text-on-surface focus:outline-none focus:border-logic-teal focus:shadow-[0_0_10px_rgba(194,101,42,0.2)] w-80 transition-all placeholder:text-terminal-dim">
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <div class="w-full">
+        <KnowledgeGrid client:load />
+    </div>
+</Layout>
