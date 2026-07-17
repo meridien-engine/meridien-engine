@@ -8,6 +8,7 @@ package db
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -91,6 +92,69 @@ func (q *Queries) GetCustomerProfileByID(ctx context.Context, id uuid.UUID) (Cus
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const listCustomers = `-- name: ListCustomers :many
+SELECT 
+    cp.id, 
+    cp.unified_name, 
+    cp.customer_tier, 
+    cp.semantic_summary, 
+    cp.created_at,
+    (SELECT cc.channel_type 
+     FROM customer_channels cc 
+     WHERE cc.customer_profile_id = cp.id 
+     ORDER BY cc.created_at ASC
+     LIMIT 1)::varchar AS primary_channel
+FROM customer_profiles cp
+WHERE cp.business_id = $3
+ORDER BY cp.created_at DESC
+LIMIT $1 OFFSET $2
+`
+
+type ListCustomersParams struct {
+	Limit      int32     `json:"limit"`
+	Offset     int32     `json:"offset"`
+	BusinessID uuid.UUID `json:"business_id"`
+}
+
+type ListCustomersRow struct {
+	ID              uuid.UUID      `json:"id"`
+	UnifiedName     sql.NullString `json:"unified_name"`
+	CustomerTier    string         `json:"customer_tier"`
+	SemanticSummary sql.NullString `json:"semantic_summary"`
+	CreatedAt       time.Time      `json:"created_at"`
+	PrimaryChannel  string         `json:"primary_channel"`
+}
+
+func (q *Queries) ListCustomers(ctx context.Context, arg ListCustomersParams) ([]ListCustomersRow, error) {
+	rows, err := q.db.QueryContext(ctx, listCustomers, arg.Limit, arg.Offset, arg.BusinessID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListCustomersRow{}
+	for rows.Next() {
+		var i ListCustomersRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.UnifiedName,
+			&i.CustomerTier,
+			&i.SemanticSummary,
+			&i.CreatedAt,
+			&i.PrimaryChannel,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const updateCustomerTier = `-- name: UpdateCustomerTier :one

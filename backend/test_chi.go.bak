@@ -1,0 +1,29 @@
+package main
+
+import (
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"github.com/go-chi/chi/v5"
+)
+
+func main() {
+	r := chi.NewRouter()
+	
+	r.Route("/api/v1/mera", func(r chi.Router) {
+		r.Post("/webhook", func(w http.ResponseWriter, req *http.Request) {})
+	})
+
+	r.Route("/api/v1", func(r chi.Router) {
+		r.Get("/orders", func(w http.ResponseWriter, req *http.Request) {
+			fmt.Fprintln(w, "Orders endpoint!")
+		})
+	})
+
+	req := httptest.NewRequest("GET", "/api/v1/orders", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	
+	fmt.Println("Status:", w.Code)
+	fmt.Println("Body:", w.Body.String())
+}

@@ -45,6 +45,9 @@ type OrderRepository interface {
 	// ListByCustomer returns all orders for a given customer.
 	ListByCustomer(ctx context.Context, customerID uuid.UUID) ([]Order, error)
 
+	// ListOrders returns all orders for the current business.
+	ListOrders(ctx context.Context, limit, offset int32) ([]Order, error)
+
 	// UpdateStatus transitions an order to a new status.
 	UpdateStatus(ctx context.Context, id uuid.UUID, status OrderStatus) (*Order, error)
 }

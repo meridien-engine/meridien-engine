@@ -81,6 +81,10 @@ func (m *mockGrpcOrderRepo) UpdateStatus(_ context.Context, id uuid.UUID, status
 	return nil, domain.ErrNotFound
 }
 
+func (m *mockGrpcOrderRepo) ListOrders(ctx context.Context, limit, offset int32) ([]domain.Order, error) {
+	return nil, nil
+}
+
 func setupBufConnServer(t *testing.T, handler *grpchandler.OrderHandler) *grpc.ClientConn {
 	const bufSize = 1024 * 1024
 	lis := bufconn.Listen(bufSize)

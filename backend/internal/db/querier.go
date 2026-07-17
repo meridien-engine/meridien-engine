@@ -29,23 +29,29 @@ type Querier interface {
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	// Atomically decrements stock. Returns error (no rows) if insufficient stock.
 	DecrementStock(ctx context.Context, arg DecrementStockParams) (Product, error)
+	DeleteSecret(ctx context.Context, arg DeleteSecretParams) error
 	ExpireInvitation(ctx context.Context, id uuid.UUID) error
 	GetBusinessByID(ctx context.Context, id uuid.UUID) (Business, error)
 	GetBusinessBySlug(ctx context.Context, slug string) (Business, error)
 	// Primary Synapse lookup: find a customer from their external channel ID.
 	GetCustomerByChannel(ctx context.Context, arg GetCustomerByChannelParams) (CustomerProfile, error)
 	GetCustomerProfileByID(ctx context.Context, id uuid.UUID) (CustomerProfile, error)
+	GetDashboardOverviewMetrics(ctx context.Context, businessID uuid.UUID) (GetDashboardOverviewMetricsRow, error)
 	// Returns all traces that are still 'pending' and have passed their TTL.
 	// Run by the background expiry checker goroutine on a ticker.
 	GetExpiredHITLSuspensions(ctx context.Context) ([]InteractionTrace, error)
 	// Fetches a single interaction log and its associated trace for Compass.
 	GetInteractionWithTrace(ctx context.Context, id uuid.UUID) (GetInteractionWithTraceRow, error)
 	GetInvitationByToken(ctx context.Context, token string) (Invitation, error)
+	GetLiveFeed(ctx context.Context, businessID uuid.UUID) ([]GetLiveFeedRow, error)
 	GetMembership(ctx context.Context, arg GetMembershipParams) (UserBusinessMembership, error)
 	GetOrderByID(ctx context.Context, id uuid.UUID) (Order, error)
 	GetPendingJoinRequest(ctx context.Context, arg GetPendingJoinRequestParams) (JoinRequest, error)
 	GetProductByID(ctx context.Context, id uuid.UUID) (Product, error)
 	GetProductBySKU(ctx context.Context, arg GetProductBySKUParams) (Product, error)
+	GetRevenueLast7Days(ctx context.Context, businessID uuid.UUID) ([]GetRevenueLast7DaysRow, error)
+	// Retrieves a single encrypted secret by business + key name.
+	GetSecret(ctx context.Context, arg GetSecretParams) (SystemSecret, error)
 	// queries/users.sql
 	// sqlc generates type-safe Go from these queries.
 	// Run: sqlc generate (from backend/)
@@ -57,23 +63,32 @@ type Querier interface {
 	//   :execrows → returns rows affected + error
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
+	InsertKnowledgeNode(ctx context.Context, arg InsertKnowledgeNodeParams) (uuid.UUID, error)
 	ListBusinessCategories(ctx context.Context) ([]BusinessCategory, error)
 	ListBusinessMembers(ctx context.Context, businessID uuid.UUID) ([]ListBusinessMembersRow, error)
+	ListCustomers(ctx context.Context, arg ListCustomersParams) ([]ListCustomersRow, error)
+	ListHITLTraces(ctx context.Context, arg ListHITLTracesParams) ([]ListHITLTracesRow, error)
 	// Paginated list for Compass dashboard.
 	ListInteractionLogs(ctx context.Context, arg ListInteractionLogsParams) ([]InteractionLog, error)
 	ListInteractionLogsByCustomer(ctx context.Context, customerID uuid.UUID) ([]InteractionLog, error)
+	ListKnowledgeNodes(ctx context.Context, businessID uuid.UUID) ([]ListKnowledgeNodesRow, error)
 	ListOrderItems(ctx context.Context, orderID uuid.UUID) ([]OrderItem, error)
+	ListOrders(ctx context.Context, arg ListOrdersParams) ([]Order, error)
 	ListOrdersByCustomer(ctx context.Context, customerID uuid.UUID) ([]Order, error)
 	ListPendingJoinRequests(ctx context.Context, businessID uuid.UUID) ([]ListPendingJoinRequestsRow, error)
 	ListProducts(ctx context.Context) ([]Product, error)
+	// Lists all key names (NOT values) for a business — for the admin UI.
+	ListSecretKeys(ctx context.Context, businessID uuid.UUID) ([]ListSecretKeysRow, error)
+	ListTraces(ctx context.Context, arg ListTracesParams) ([]ListTracesRow, error)
 	ListUserBusinesses(ctx context.Context, userID uuid.UUID) ([]ListUserBusinessesRow, error)
 	ReviewJoinRequest(ctx context.Context, arg ReviewJoinRequestParams) (JoinRequest, error)
 	SoftDeleteProduct(ctx context.Context, id uuid.UUID) error
 	SoftDeleteUser(ctx context.Context, id uuid.UUID) error
+	// Resolves a HITL suspension as timed_out (used by background job).
+	TimeoutHITLSuspension(ctx context.Context, traceID uuid.UUID) error
 	UpdateBusiness(ctx context.Context, arg UpdateBusinessParams) (Business, error)
 	UpdateCustomerTier(ctx context.Context, arg UpdateCustomerTierParams) (CustomerProfile, error)
-	// Resolves a HITL suspension (approved / rejected / timed_out).
-	UpdateHITLStatus(ctx context.Context, arg UpdateHITLStatusParams) (InteractionTrace, error)
+	UpdateHITLStatus(ctx context.Context, arg UpdateHITLStatusParams) error
 	UpdateMembershipRole(ctx context.Context, arg UpdateMembershipRoleParams) (UserBusinessMembership, error)
 	UpdateMembershipStatus(ctx context.Context, arg UpdateMembershipStatusParams) (UserBusinessMembership, error)
 	UpdateOrderStatus(ctx context.Context, arg UpdateOrderStatusParams) (Order, error)
@@ -82,6 +97,10 @@ type Querier interface {
 	// Resolves or creates the channel mapping, returning the customer profile.
 	// Used by Synapse on every inbound message to identify the customer.
 	UpsertCustomerChannel(ctx context.Context, arg UpsertCustomerChannelParams) (CustomerChannel, error)
+	// queries/secrets.sql
+	// Inserts or updates a secret for a business.
+	// The value must be encrypted BEFORE calling this query.
+	UpsertSecret(ctx context.Context, arg UpsertSecretParams) (SystemSecret, error)
 }
 
 var _ Querier = (*Queries)(nil)

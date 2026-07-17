@@ -52,6 +52,7 @@ sqlc:
 build:
 	cd backend && go build -o bin/meridien-server ./cmd/server
 
+
 vet:
 	cd backend && go vet ./...
 
@@ -68,7 +69,8 @@ lint:
 
 # ── Run ───────────────────────────────────────────────────────────────────────
 
-run:
+run: build
 	cd backend && \
+	PORT="8081" \
 	DATABASE_URL="postgres://meridien:meridien@localhost:5432/meridien?sslmode=disable" \
-	go run ./cmd/server
+	./bin/meridien-server

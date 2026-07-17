@@ -32,7 +32,7 @@ CREATE TABLE knowledge_nodes (
   business_id UUID         NOT NULL REFERENCES businesses(id),
   source_name VARCHAR(255) NOT NULL, -- Original document filename / title
   content     TEXT         NOT NULL, -- Raw text of this chunk
-  embedding   vector(1536) NOT NULL, -- Embedding vector
+  embedding   vector(768)  NOT NULL, -- Embedding vector (768 dims = Gemini text-embedding-004)
   created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
 

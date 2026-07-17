@@ -22,6 +22,12 @@ SET status = $2
 WHERE id = $1
 RETURNING *;
 
+-- name: ListOrders :many
+SELECT * FROM orders
+WHERE business_id = $3
+ORDER BY created_at DESC
+LIMIT $1 OFFSET $2;
+
 -- name: CreateOrderItem :one
 INSERT INTO order_items (
   order_id, product_id, sku, name, quantity, unit_price

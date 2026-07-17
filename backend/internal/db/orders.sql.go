@@ -154,6 +154,52 @@ func (q *Queries) ListOrderItems(ctx context.Context, orderID uuid.UUID) ([]Orde
 	return items, nil
 }
 
+const listOrders = `-- name: ListOrders :many
+SELECT id, business_id, customer_id, total_price, status, source, notes, created_at, updated_at FROM orders
+WHERE business_id = $3
+ORDER BY created_at DESC
+LIMIT $1 OFFSET $2
+`
+
+type ListOrdersParams struct {
+	Limit      int32     `json:"limit"`
+	Offset     int32     `json:"offset"`
+	BusinessID uuid.UUID `json:"business_id"`
+}
+
+func (q *Queries) ListOrders(ctx context.Context, arg ListOrdersParams) ([]Order, error) {
+	rows, err := q.db.QueryContext(ctx, listOrders, arg.Limit, arg.Offset, arg.BusinessID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Order{}
+	for rows.Next() {
+		var i Order
+		if err := rows.Scan(
+			&i.ID,
+			&i.BusinessID,
+			&i.CustomerID,
+			&i.TotalPrice,
+			&i.Status,
+			&i.Source,
+			&i.Notes,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listOrdersByCustomer = `-- name: ListOrdersByCustomer :many
 SELECT id, business_id, customer_id, total_price, status, source, notes, created_at, updated_at FROM orders
 WHERE customer_id = $1

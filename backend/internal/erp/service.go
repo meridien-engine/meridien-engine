@@ -134,6 +134,11 @@ func (s *Service) ListOrdersByCustomer(ctx context.Context, customerID uuid.UUID
 	return s.orders.ListByCustomer(ctx, customerID)
 }
 
+// ListOrders retrieves all orders.
+func (s *Service) ListOrders(ctx context.Context, limit, offset int32) ([]domain.Order, error) {
+	return s.orders.ListOrders(ctx, limit, offset)
+}
+
 // UpdateOrderStatus updates the status of an existing order.
 func (s *Service) UpdateOrderStatus(ctx context.Context, orderID uuid.UUID, status domain.OrderStatus) (*domain.Order, error) {
 	return s.orders.UpdateStatus(ctx, orderID, status)

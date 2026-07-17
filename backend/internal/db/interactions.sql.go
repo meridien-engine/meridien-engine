@@ -335,34 +335,14 @@ func (q *Queries) ListInteractionLogsByCustomer(ctx context.Context, customerID 
 	return items, nil
 }
 
-const updateHITLStatus = `-- name: UpdateHITLStatus :one
+const timeoutHITLSuspension = `-- name: TimeoutHITLSuspension :exec
 UPDATE interaction_traces
-SET hitl_status = $1
-WHERE id = $2
-RETURNING id, interaction_log_id, retrieved_contexts, system_prompt, raw_agent_thoughts, tools_called, created_at, workflow_id, hitl_status, suspended_at, expires_at
+SET hitl_status = 'timed_out'
+WHERE id = $1
 `
 
-type UpdateHITLStatusParams struct {
-	Status  string    `json:"status"`
-	TraceID uuid.UUID `json:"trace_id"`
-}
-
-// Resolves a HITL suspension (approved / rejected / timed_out).
-func (q *Queries) UpdateHITLStatus(ctx context.Context, arg UpdateHITLStatusParams) (InteractionTrace, error) {
-	row := q.db.QueryRowContext(ctx, updateHITLStatus, arg.Status, arg.TraceID)
-	var i InteractionTrace
-	err := row.Scan(
-		&i.ID,
-		&i.InteractionLogID,
-		&i.RetrievedContexts,
-		&i.SystemPrompt,
-		&i.RawAgentThoughts,
-		&i.ToolsCalled,
-		&i.CreatedAt,
-		&i.WorkflowID,
-		&i.HitlStatus,
-		&i.SuspendedAt,
-		&i.ExpiresAt,
-	)
-	return i, err
+// Resolves a HITL suspension as timed_out (used by background job).
+func (q *Queries) TimeoutHITLSuspension(ctx context.Context, traceID uuid.UUID) error {
+	_, err := q.db.ExecContext(ctx, timeoutHITLSuspension, traceID)
+	return err
 }

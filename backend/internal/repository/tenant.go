@@ -47,9 +47,9 @@ func ExecWithTenant(ctx context.Context, db *sql.DB, businessID string, fn func(
 	}
 
 	// Inject the RLS session variable for this transaction only.
-	// SET LOCAL ensures it is scoped to the transaction and auto-cleared
+	// set_config with true ensures it is scoped to the transaction and auto-cleared
 	// on commit or rollback — it cannot leak across connections.
-	if _, err = tx.ExecContext(ctx, "SET LOCAL app.current_business = $1", businessID); err != nil {
+	if _, err = tx.ExecContext(ctx, "SELECT set_config('app.current_business', $1, true)", businessID); err != nil {
 		_ = tx.Rollback()
 		return fmt.Errorf("set rls context: %w", err)
 	}
@@ -69,7 +69,7 @@ func ExecWithTenant(ctx context.Context, db *sql.DB, businessID string, fn func(
 // Note: This must be used with a dedicated connection (sql.Conn), not a
 // pool (*sql.DB), to guarantee the SET LOCAL is visible to the query.
 func QueryWithTenant(ctx context.Context, conn *sql.Conn, businessID string, fn func() error) error {
-	if _, err := conn.ExecContext(ctx, "SET LOCAL app.current_business = $1", businessID); err != nil {
+	if _, err := conn.ExecContext(ctx, "SELECT set_config('app.current_business', $1, true)", businessID); err != nil {
 		return fmt.Errorf("set rls context (read): %w", err)
 	}
 	return fn()

@@ -1,0 +1,31 @@
+---
+import Layout from '../layouts/Layout.astro';
+import HITLGrid from '../components/hitl/HITLGrid.tsx';
+---
+
+<Layout title="Meridien Merchant Portal - Human Review (HITL)">
+    <!-- Topbar -->
+    <header class="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10 border-b border-circuit-grey pb-6">
+        <div>
+            <h2 class="text-3xl font-bold tracking-tight text-on-surface font-heading flex items-center gap-3">
+                <svg class="w-7 h-7 text-logic-teal" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                Human Review
+            </h2>
+            <p class="text-on-surface-variant mt-2 text-sm">Review AI interactions suspended for human intervention.</p>
+        </div>
+        <div class="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6 w-full md:w-auto">
+            <!-- Search -->
+            <div class="relative group w-full sm:w-auto">
+                <svg class="w-4 h-4 text-logic-teal absolute left-4 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                <input type="text" placeholder="Search by trace ID, channel, or prompt..." class="w-full sm:w-80 bg-surface-container-lowest border border-circuit-grey rounded-full py-2.5 pl-10 pr-5 text-sm text-on-surface focus:outline-none focus:border-logic-teal focus:shadow-[0_0_10px_rgba(194,101,42,0.2)] transition-all placeholder:text-terminal-dim">
+            </div>
+            <button class="w-full sm:w-auto bg-logic-teal hover:bg-logic-teal/90 text-surface-container-lowest px-5 py-2.5 rounded-lg text-sm font-medium transition-colors shadow-lg shadow-logic-teal/20 whitespace-nowrap">
+                Bulk Approve
+            </button>
+        </div>
+    </header>
+
+    <div class="w-full">
+        <HITLGrid client:load />
+    </div>
+</Layout>

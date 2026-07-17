@@ -67,9 +67,9 @@ SELECT * FROM interaction_traces
 WHERE hitl_status = 'pending'
   AND expires_at < NOW();
 
--- name: UpdateHITLStatus :one
--- Resolves a HITL suspension (approved / rejected / timed_out).
+
+-- name: TimeoutHITLSuspension :exec
+-- Resolves a HITL suspension as timed_out (used by background job).
 UPDATE interaction_traces
-SET hitl_status = sqlc.arg(status)
-WHERE id = sqlc.arg(trace_id)
-RETURNING *;
+SET hitl_status = 'timed_out'
+WHERE id = sqlc.arg(trace_id);

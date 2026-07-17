@@ -43,3 +43,20 @@ JOIN customer_channels cc ON cc.customer_profile_id = cp.id
 WHERE cc.channel_type = $1
   AND cc.channel_external_id = $2
 LIMIT 1;
+
+-- name: ListCustomers :many
+SELECT 
+    cp.id, 
+    cp.unified_name, 
+    cp.customer_tier, 
+    cp.semantic_summary, 
+    cp.created_at,
+    (SELECT cc.channel_type 
+     FROM customer_channels cc 
+     WHERE cc.customer_profile_id = cp.id 
+     ORDER BY cc.created_at ASC
+     LIMIT 1)::varchar AS primary_channel
+FROM customer_profiles cp
+WHERE cp.business_id = $3
+ORDER BY cp.created_at DESC
+LIMIT $1 OFFSET $2;
