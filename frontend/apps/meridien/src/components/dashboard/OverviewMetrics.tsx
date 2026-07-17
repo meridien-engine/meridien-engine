@@ -1,7 +1,7 @@
 import { createResource } from 'solid-js';
 
 // Mock JWT for local development (payload contains business_id: 3b825f22-73a8-487f-90d1-794fdf3e81df)
-const DEV_JWT = "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJidXNpbmVzc19pZCI6IjNiODI1ZjIyLTczYTgtNDg3Zi05MGQxLTc5NGZkZjNlODFkZiJ9.";
+const DEV_JWT = typeof window !== 'undefined' ? localStorage.getItem('MERIDIEN_AUTH_TOKEN') || '' : '';
 
 type OverviewMetricsData = {
     total_revenue: number;

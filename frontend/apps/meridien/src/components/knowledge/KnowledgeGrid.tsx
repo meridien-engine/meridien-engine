@@ -1,6 +1,6 @@
 import { createResource, createSignal, For, Show } from 'solid-js';
 
-const DEV_JWT = "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJidXNpbmVzc19pZCI6IjNiODI1ZjIyLTczYTgtNDg3Zi05MGQxLTc5NGZkZjNlODFkZiJ9.";
+const DEV_JWT = typeof window !== 'undefined' ? localStorage.getItem('MERIDIEN_AUTH_TOKEN') || '' : '';
 
 type KnowledgeNode = {
     id: string;

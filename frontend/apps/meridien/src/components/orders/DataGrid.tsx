@@ -13,7 +13,7 @@ interface Order {
 
 // Mock JWT for local development (payload contains business_id: 3b825f22-73a8-487f-90d1-794fdf3e81df)
 // The backend middleware currently only parses the payload segment without signature verification in dev.
-const DEV_JWT = "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJidXNpbmVzc19pZCI6IjNiODI1ZjIyLTczYTgtNDg3Zi05MGQxLTc5NGZkZjNlODFkZiJ9.";
+const DEV_JWT = typeof window !== 'undefined' ? localStorage.getItem('MERIDIEN_AUTH_TOKEN') || '' : '';
 
 // Fetch orders from the Go backend
 const fetchOrders = async (): Promise<Order[]> => {
