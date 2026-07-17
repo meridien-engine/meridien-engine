@@ -78,6 +78,7 @@ type Querier interface {
 	ListProducts(ctx context.Context) ([]Product, error)
 	// Lists all key names (NOT values) for a business — for the admin UI.
 	ListSecretKeys(ctx context.Context, businessID uuid.UUID) ([]ListSecretKeysRow, error)
+	ListTraces(ctx context.Context, arg ListTracesParams) ([]ListTracesRow, error)
 	ListUserBusinesses(ctx context.Context, userID uuid.UUID) ([]ListUserBusinessesRow, error)
 	ReviewJoinRequest(ctx context.Context, arg ReviewJoinRequestParams) (JoinRequest, error)
 	SoftDeleteProduct(ctx context.Context, id uuid.UUID) error

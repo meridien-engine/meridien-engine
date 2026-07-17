@@ -3,15 +3,15 @@ import { createResource, For, createSignal, Show } from 'solid-js';
 const DEV_JWT = "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJidXNpbmVzc19pZCI6IjNiODI1ZjIyLTczYTgtNDg3Zi05MGQxLTc5NGZkZjNlODFkZiJ9.";
 
 type TraceRecord = {
-    id: string;
+    trace_id: string;
     interaction_log_id: string;
     channel: string;
     inbound_msg: string;
     outbound_msg: string;
     tokens_used: number;
     latency_ms: number;
-    created_at: string;
-    hitl_status: string;
+    trace_created_at: string;
+    hitl_status?: string;
     raw_agent_thoughts: string;
     tools_called: any[];
     retrieved_contexts: any[];
@@ -25,28 +25,28 @@ const fetchTraces = async (): Promise<TraceRecord[]> => {
         // If the backend isn't ready yet, return mock data for UI testing
         return [
             {
-                id: "trace-1a2b3c4d",
+                trace_id: "trace-1a2b3c4d",
                 interaction_log_id: "log-9x8y7z",
                 channel: "whatsapp",
                 inbound_msg: "Where is my order? I ordered 2 days ago.",
                 outbound_msg: "Your order #4912 is currently out for delivery and should arrive by 8 PM today.",
                 tokens_used: 432,
                 latency_ms: 1250,
-                created_at: new Date().toISOString(),
+                trace_created_at: new Date().toISOString(),
                 hitl_status: "none",
                 raw_agent_thoughts: "Thinking Process:\n1. User is asking for order status.\n2. Need to extract order info using customer ID.\n3. Found order #4912 in ERP.\n4. Status is 'Out for Delivery'.\n5. Formulate polite response.",
                 tools_called: [{ name: "lookup_order_by_customer", args: { customer_id: "cus-123" }, result: "Order 4912, Status: Out for delivery" }],
                 retrieved_contexts: []
             },
             {
-                id: "trace-5e6f7g8h",
+                trace_id: "trace-5e6f7g8h",
                 interaction_log_id: "log-1w2v3u",
                 channel: "messenger",
                 inbound_msg: "Can I get a discount if I buy 50 units?",
                 outbound_msg: "Let me forward this request to our sales team for approval. They will contact you shortly.",
                 tokens_used: 512,
                 latency_ms: 2100,
-                created_at: new Date(Date.now() - 3600000).toISOString(),
+                trace_created_at: new Date(Date.now() - 3600000).toISOString(),
                 hitl_status: "pending",
                 raw_agent_thoughts: "Thinking Process:\n1. User requesting bulk discount.\n2. Check policy in Knowledge Base.\n3. Policy states >20 units requires sales approval.\n4. Triggering HITL suspension workflow.",
                 tools_called: [{ name: "search_knowledge_base", args: { query: "bulk discount policy" }, result: "Discounts for >20 units require human approval." }],
@@ -103,17 +103,17 @@ export default function TraceGrid() {
                                     <div class="border-b border-circuit-grey/50">
                                         {/* Main Row */}
                                         <div 
-                                            class={`flex items-center px-6 py-4 cursor-pointer transition-colors ${expandedTraceId() === trace.id ? 'bg-surface-container-highest' : 'hover:bg-surface-container-highest'}`}
-                                            onClick={() => toggleExpand(trace.id)}
+                                            class={`flex items-center px-6 py-4 cursor-pointer transition-colors ${expandedTraceId() === trace.trace_id ? 'bg-surface-container-highest' : 'hover:bg-surface-container-highest'}`}
+                                            onClick={() => toggleExpand(trace.trace_id)}
                                         >
                                             <div class="w-1/12 pr-4 text-terminal-dim">
-                                                <svg class={`w-5 h-5 transition-transform ${expandedTraceId() === trace.id ? 'rotate-90 text-logic-teal' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                                                <svg class={`w-5 h-5 transition-transform ${expandedTraceId() === trace.trace_id ? 'rotate-90 text-logic-teal' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
                                             </div>
                                             <div class="w-2/12 pr-4 flex flex-col gap-1">
-                                                <span class="text-sm font-medium text-on-surface">{new Date(trace.created_at).toLocaleTimeString()}</span>
+                                                <span class="text-sm font-medium text-on-surface">{new Date(trace.trace_created_at).toLocaleTimeString()}</span>
                                                 <div class="flex items-center gap-2">
                                                     <span class="text-xs text-on-surface-variant capitalize">{trace.channel}</span>
-                                                    {getHitlBadge(trace.hitl_status)}
+                                                    {getHitlBadge(trace.hitl_status || 'none')}
                                                 </div>
                                             </div>
                                             <div class="w-3/12 pr-4">
@@ -131,7 +131,7 @@ export default function TraceGrid() {
                                         </div>
 
                                         {/* Expanded Detail Panel */}
-                                        <Show when={expandedTraceId() === trace.id}>
+                                        <Show when={expandedTraceId() === trace.trace_id}>
                                             <div class="bg-surface-container p-6 border-t border-circuit-grey/50 shadow-inner">
                                                 <div class="grid grid-cols-2 gap-8">
                                                     {/* Left: Chain of Thought */}

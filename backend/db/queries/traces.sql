@@ -20,4 +20,4 @@ FROM interaction_traces it
 JOIN interaction_logs il ON it.interaction_log_id = il.id
 WHERE il.business_id = sqlc.arg(business_id)
 ORDER BY il.created_at DESC
-LIMIT sqlc.arg(limit) OFFSET sqlc.arg(offset);
+LIMIT sqlc.arg(lim) OFFSET sqlc.arg(off);
