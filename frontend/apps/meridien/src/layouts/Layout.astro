@@ -27,20 +27,17 @@ const { title } = Astro.props;
         </div>
 
         <!-- Mobile Header (Visible only on small screens) -->
-        <div class="md:hidden flex items-center justify-between p-4 bg-void-black/80 backdrop-blur-md border-b border-circuit-grey fixed top-0 left-0 right-0 z-50">
+        <div class="md:hidden flex items-center p-4 bg-void-black/80 backdrop-blur-md border-b border-circuit-grey fixed top-0 left-0 right-0 z-50">
             <div class="flex items-center gap-2">
                 <div class="w-6 h-6 flex-shrink-0 border border-logic-teal/30 rounded flex items-center justify-center bg-logic-teal/5">
                     <span class="text-logic-teal font-bold text-xs">M</span>
                 </div>
                 <h1 class="text-sm font-bold tracking-tight text-on-surface font-heading">Meridien</h1>
             </div>
-            <button id="mobile-menu-btn" class="text-on-surface-variant hover:text-logic-teal transition-colors">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
-            </button>
         </div>
 
         <!-- Persistent Navigation Sidebar -->
-        <aside id="sidebar" class="w-[280px] bg-void-black/95 md:bg-void-black/80 backdrop-blur-md border-r border-circuit-grey flex flex-col justify-between p-6 shrink-0 fixed h-full z-40 transition-transform duration-300 -translate-x-full md:translate-x-0">
+        <aside id="sidebar" class="hidden md:flex w-[280px] bg-void-black/80 backdrop-blur-md border-r border-circuit-grey flex-col justify-between p-6 shrink-0 fixed h-full z-40">
             <div>
                 <!-- Platform Brand & Logo -->
                 <div class="flex items-center justify-between mb-10">
@@ -108,24 +105,27 @@ const { title } = Astro.props;
         </aside>
 
         <!-- Main Content Area -->
-        <main class="flex-1 ml-0 md:ml-[280px] p-4 md:p-8 pt-20 md:pt-8 relative z-10 w-full overflow-x-hidden">
+        <main class="flex-1 ml-0 md:ml-[280px] p-4 md:p-8 pt-20 md:pt-8 pb-24 md:pb-8 relative z-10 w-full overflow-x-hidden">
             <slot />
         </main>
 
-        <script>
-            // Mobile Sidebar Toggle Logic
-            const menuBtn = document.getElementById('mobile-menu-btn');
-            const closeBtn = document.getElementById('close-sidebar-btn');
-            const sidebar = document.getElementById('sidebar');
-
-            if (menuBtn && closeBtn && sidebar) {
-                menuBtn.addEventListener('click', () => {
-                    sidebar.classList.remove('-translate-x-full');
-                });
-                closeBtn.addEventListener('click', () => {
-                    sidebar.classList.add('-translate-x-full');
-                });
-            }
-        </script>
+        <!-- Mobile Bottom Navigation Bar -->
+        <nav class="md:hidden fixed bottom-0 left-0 right-0 bg-void-black/95 backdrop-blur-md border-t border-circuit-grey z-50 px-6 py-3 flex justify-between items-center pb-safe">
+            <a href="/" class="flex flex-col items-center gap-1 text-on-surface-variant hover:text-logic-teal transition-colors">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
+            </a>
+            <a href="/orders" class="flex flex-col items-center gap-1 text-on-surface-variant hover:text-logic-teal transition-colors">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>
+            </a>
+            <a href="/customers" class="flex flex-col items-center gap-1 text-on-surface-variant hover:text-logic-teal transition-colors">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+            </a>
+            <a href="/knowledge" class="flex flex-col items-center gap-1 text-on-surface-variant hover:text-logic-teal transition-colors">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+            </a>
+            <a href="/settings" class="flex flex-col items-center gap-1 text-on-surface-variant hover:text-logic-teal transition-colors">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+            </a>
+        </nav>
 	</body>
 </html>
